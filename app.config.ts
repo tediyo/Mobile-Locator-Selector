@@ -24,7 +24,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
   },
   web: { bundler: 'metro', output: 'static', favicon: './assets/images/favicon.png' },
-  plugins: ['expo-router'],
+  plugins: ['expo-router', '@react-native-community/datetimepicker'],
   experiments: { typedRoutes: true },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001',

@@ -31,10 +31,13 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
 *.tsbuildinfo
+
+# parent monorepo should not track this folder (see ../.gitignore)
 
 # generated native folders
 /ios

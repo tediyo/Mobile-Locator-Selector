@@ -71,6 +71,34 @@ src/
 
 - **Physical device:** set `EXPO_PUBLIC_API_URL` to `http://YOUR_PC_LAN_IP:3001` (not `localhost`).
 - **Android emulator:** use `http://10.0.2.2:3001` for host machine localhost.
+
+### Package versions (Expo SDK 54)
+
+If Expo warns about mismatched packages, run:
+
+```bash
+npx expo install @react-native-async-storage/async-storage @react-native-community/datetimepicker @react-native-picker/picker expo-auth-session expo-clipboard react-native-svg
+```
+
+### Android emulator: `Can't find service: package`
+
+This means the emulator is not fully booted (or ADB is stuck), so Expo cannot install Expo Go.
+
+1. Open **Android Studio → Device Manager** and start **Medium_Phone** (or your AVD).
+2. Wait until the Android **home screen** is visible (not a black screen).
+3. In a new terminal: `adb devices` — the device should show `device`, not `offline`.
+4. Run `npm start` again and press **`a`**, **or** skip the emulator and scan the QR code with **Expo Go** on your phone (same Wi‑Fi).
+
+If it still fails:
+
+```bash
+adb kill-server
+adb start-server
+```
+
+Then cold-boot the emulator: Device Manager → ⋮ on the AVD → **Cold Boot Now**.
+
+**Fastest path:** install [Expo Go](https://expo.dev/go) on your phone, run `npm start`, scan the QR code — no emulator required.
 - Copy logo images from `frontend/public/Logo/` into `assets/Logo/` and wire `Logo.tsx` if you want image logos instead of the text mark.
 
 ## Scripts

@@ -37,8 +37,8 @@ export default function SignupScreen() {
       } else {
         setError(data.message || 'Registration failed');
       }
-    } catch {
-      setError('Connection error');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Connection error');
     } finally {
       setLoading(false);
     }

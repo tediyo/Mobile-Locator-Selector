@@ -33,8 +33,8 @@ export default function LoginScreen() {
       } else {
         setError((data as { message?: string }).message || 'Login failed');
       }
-    } catch {
-      setError('Connection error');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Connection error (${API_URL})`);
     } finally {
       setLoading(false);
     }
@@ -89,6 +89,10 @@ export default function LoginScreen() {
             <Text style={{ color: colors.muted, fontSize: 14 }}>Continue as Guest</Text>
           </Pressable>
 
+          <Text style={[styles.apiHint, { color: colors.muted }]} numberOfLines={2}>
+            API: {API_URL}
+          </Text>
+
           <Text style={[styles.footer, { color: colors.muted }]}>
             Don&apos;t have an account?{' '}
             <Link href="/signup" style={{ color: colors.accent, fontWeight: '600' }}>
@@ -112,5 +116,6 @@ const styles = StyleSheet.create({
   line: { flex: 1, height: 1 },
   outlineBtn: { padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
   guestBtn: { padding: 12, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
+  apiHint: { textAlign: 'center', fontSize: 10, fontFamily: 'monospace' },
   footer: { textAlign: 'center', fontSize: 14, marginTop: 8 },
 });
