@@ -1,8 +1,8 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useAuth } from '@/src/context/AuthContext';
-import { useTheme } from '@/src/context/ThemeContext';
-import { Logo } from '@/src/components/Logo';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { Logo } from './Logo';
+import Icon from 'react-native-vector-icons/FontAwesome';
 
 export function DashboardHeader() {
   const { user, isGuest, logout } = useAuth();
@@ -18,7 +18,7 @@ export function DashboardHeader() {
       </View>
       <View style={styles.actions}>
         <Pressable onPress={toggleTheme} style={[styles.iconBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-          <FontAwesome name={theme === 'dark' ? 'sun-o' : 'moon-o'} size={16} color={colors.muted} />
+          <Icon name={theme === 'dark' ? 'sun-o' : 'moon-o'} size={16} color={colors.muted} />
         </Pressable>
         {isGuest ? (
           <Pressable onPress={logout}>

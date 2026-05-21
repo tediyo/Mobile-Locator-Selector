@@ -1,110 +1,54 @@
 # TWT Locator — Mobile App
 
-React Native (Expo) client for the TWT QA Locator Tool. UI and flows match the web app: login, signup, guest mode, locator generation, analytics overview, search history, and profile.
-
-This folder is a **standalone Git repository**, separate from the main TWT monorepo.
+React Native (bare) client for the TWT QA Locator Tool. No Expo — runs as a standard native Android app via USB or Android Studio.
 
 ## Prerequisites
 
 - Node.js 20+
-- [Expo Go](https://expo.dev/go) on your phone, or Android Studio / Xcode for emulators
-- Backend API running (see `../backend`)
+- Android Studio + SDK (`ANDROID_HOME` set, `platform-tools` on `PATH`)
+- Physical device with USB debugging, or an Android emulator
+- Backend API reachable (default: production on Render)
 
 ## Setup
 
 ```bash
-cd Mobile
 npm install
-cp .env.example .env
-# Edit .env — set EXPO_PUBLIC_API_URL to your backend (use LAN IP on device)
-npm start
 ```
 
-Press `a` for Android, `i` for iOS, or scan the QR code with Expo Go.
+API base URL is `https://twt-pktm.onrender.com` in `src/config/env.ts` (`API_BASE_URL`). For a local backend, set `USE_LOCAL_API = true` and `DEV_MACHINE_HOST` to your PC’s LAN IP.
 
-## Push to a separate GitHub repo
+## Run on USB device
 
-From inside `Mobile/`:
+1. Connect phone, enable USB debugging, verify: `adb devices`
+2. Terminal 1: `npm start`
+3. Terminal 2: `npm run android`
 
-```bash
-git init
-git add .
-git commit -m "Initial TWT Locator mobile app"
-git branch -M main
-git remote add origin https://github.com/YOUR_USER/twt-locator-mobile.git
-git push -u origin main
-```
+Or open `android/` in Android Studio, start Metro (`npm start`), then Run on your device.
 
-The parent TWT repo ignores `Mobile/` via root `.gitignore`, so the mobile app is not tracked there.
+## API URL
 
-## Project structure
-
-```
-app/                 Expo Router screens
-  login.tsx
-  signup.tsx
-  (main)/(tabs)/     Overview, Locator, History, Profile
-src/
-  api/               API client
-  context/           Auth & theme (matches web)
-  theme/             Light/dark colors (matches globals.css)
-  lib/               Analytics & locator snippets
-  components/        Shared UI
-```
-
-## Features (parity with web)
-
-| Feature | Mobile |
-|--------|--------|
-| Email login / signup | Yes |
-| Guest mode | Yes |
-| Google OAuth | Opens system browser (`/auth/google`) |
-| Locator generation | Yes |
-| Auth section (cookies, token, site login) | Yes |
-| Framework snippets (Playwright, Cypress, Selenium) | Yes |
-| Analytics overview + date filters | Yes |
-| Search history | Yes (signed-in users) |
-| Profile edit | Yes |
-| Dark / light theme | Yes |
-
-## Notes
-
-- **Physical device:** set `EXPO_PUBLIC_API_URL` to `http://YOUR_PC_LAN_IP:3001` (not `localhost`).
-- **Android emulator:** use `http://10.0.2.2:3001` for host machine localhost.
-
-### Package versions (Expo SDK 54)
-
-If Expo warns about mismatched packages, run:
-
-```bash
-npx expo install @react-native-async-storage/async-storage @react-native-community/datetimepicker @react-native-picker/picker expo-auth-session expo-clipboard react-native-svg
-```
-
-### Android emulator: `Can't find service: package`
-
-This means the emulator is not fully booted (or ADB is stuck), so Expo cannot install Expo Go.
-
-1. Open **Android Studio → Device Manager** and start **Medium_Phone** (or your AVD).
-2. Wait until the Android **home screen** is visible (not a black screen).
-3. In a new terminal: `adb devices` — the device should show `device`, not `offline`.
-4. Run `npm start` again and press **`a`**, **or** skip the emulator and scan the QR code with **Expo Go** on your phone (same Wi‑Fi).
-
-If it still fails:
-
-```bash
-adb kill-server
-adb start-server
-```
-
-Then cold-boot the emulator: Device Manager → ⋮ on the AVD → **Cold Boot Now**.
-
-**Fastest path:** install [Expo Go](https://expo.dev/go) on your phone, run `npm start`, scan the QR code — no emulator required.
-- Copy logo images from `frontend/public/Logo/` into `assets/Logo/` and wire `Logo.tsx` if you want image logos instead of the text mark.
+| Target | URL |
+|--------|-----|
+| Default (production) | `https://twt-pktm.onrender.com` — `API_BASE_URL` in `src/config/env.ts` |
+| Local backend | Set `USE_LOCAL_API = true`, then `http://YOUR_PC_IP:3001` or emulator `10.0.2.2` |
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | Start Expo dev server |
-| `npm run android` | Open on Android |
-| `npm run ios` | Open on iOS |
+| `npm start` | Metro bundler |
+| `npm run android` | Build & install on device/emulator |
+
+## Project structure
+
+```
+App.tsx                 Root component
+index.js                Entry point
+src/
+  navigation/           React Navigation (stack + tabs)
+  screens/              Login, tabs, etc.
+  api/                  API client
+  context/              Auth & theme
+  components/           Shared UI
+android/                Native Android project (open in Android Studio)
+```

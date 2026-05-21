@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter, useSegments } from 'expo-router';
+import { parseOAuthCallback } from '../auth/oauth';
+import { resetToRoute } from '../navigation/navigationRef';
 
 export interface User {
   id: string;
@@ -28,8 +30,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-  const segments = useSegments();
 
   useEffect(() => {
     (async () => {
@@ -51,19 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  useEffect(() => {
-    if (isLoading) return;
-    const inAuth = segments[0] === 'login' || segments[0] === 'signup';
-    const inApp = segments[0] === '(main)';
-    if (!user && !isGuest && !inAuth) {
-      router.replace('/login');
-    } else if ((user || isGuest) && inAuth) {
-      router.replace('/(main)/(tabs)/overview');
-    } else if ((user || isGuest) && !inApp && !inAuth && segments[0] !== '+not-found') {
-      router.replace('/(main)/(tabs)/overview');
-    }
-  }, [user, isGuest, isLoading, segments, router]);
-
   const login = useCallback(async (newToken: string, newUser: User) => {
     setToken(newToken);
     setUser(newUser);
@@ -73,8 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       [USER_KEY, JSON.stringify(newUser)],
     ]);
     await AsyncStorage.removeItem(GUEST_KEY);
-    router.replace('/(main)/(tabs)/overview');
-  }, [router]);
+    resetToRoute('Main');
+  }, []);
 
   const loginAsGuest = useCallback(async () => {
     setToken(null);
@@ -82,16 +69,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsGuest(true);
     await AsyncStorage.setItem(GUEST_KEY, 'true');
     await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
-    router.replace('/(main)/(tabs)/overview');
-  }, [router]);
+    resetToRoute('Main');
+  }, []);
 
   const logout = useCallback(async () => {
     setToken(null);
     setUser(null);
     setIsGuest(false);
     await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY, GUEST_KEY]);
-    router.replace('/login');
-  }, [router]);
+    resetToRoute('Login');
+  }, []);
+
+  const handleOAuthUrl = useCallback(
+    async (url: string | null) => {
+      if (!url) return;
+      const payload = parseOAuthCallback(url);
+      if (payload) await login(payload.token, payload.user);
+    },
+    [login],
+  );
+
+  useEffect(() => {
+    Linking.getInitialURL().then(handleOAuthUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleOAuthUrl(url);
+    });
+    return () => subscription.remove();
+  }, [handleOAuthUrl]);
 
   return (
     <AuthContext.Provider value={{ user, token, isGuest, isLoading, login, loginAsGuest, logout }}>
