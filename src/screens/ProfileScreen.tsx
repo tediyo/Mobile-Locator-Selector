@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../config/api';
 import { apiFetch } from '../api/client';
+import { ProfileAvatar } from '../components/profile/ProfileAvatar';
+import { resolveProfilePictureUrl } from '../lib/profilePicture';
 
 interface ProfileData {
   id: string;
@@ -22,6 +24,14 @@ interface ProfileData {
   phoneNumber?: string;
   isGoogleUser?: boolean;
   createdAt?: string;
+  pictureUrl?: string;
+}
+
+function withPictureUrl(data: ProfileData & Record<string, unknown>): ProfileData {
+  return {
+    ...data,
+    pictureUrl: resolveProfilePictureUrl(data) ?? data.pictureUrl,
+  };
 }
 
 function formatMemberSince(iso?: string): string {
@@ -50,11 +60,12 @@ export function ProfileScreen() {
       return;
     }
     setLoading(true);
-    apiFetch<ProfileData>('/users/me', { token }).then(({ ok, data }) => {
+    apiFetch<ProfileData & Record<string, unknown>>('/users/me', { token }).then(({ ok, data }) => {
       if (ok) {
-        setProfile(data);
-        setFullName(data.fullName || '');
-        setPhoneNumber(data.phoneNumber || '');
+        const next = withPictureUrl(data);
+        setProfile(next);
+        setFullName(next.fullName || '');
+        setPhoneNumber(next.phoneNumber || '');
       }
       setLoading(false);
     });
@@ -70,7 +81,7 @@ export function ProfileScreen() {
       body: JSON.stringify({ fullName, phoneNumber }),
     });
     if (ok) {
-      setProfile(data);
+      setProfile(withPictureUrl({ ...data, pictureUrl: profile?.pictureUrl }));
       setEditing(false);
       setMsg({ type: 'ok', text: 'Profile updated successfully.' });
     } else {
@@ -94,12 +105,7 @@ export function ProfileScreen() {
     ]);
   };
 
-  const initials = (profile?.fullName || user?.email || 'U')
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  const pictureUrl = profile?.pictureUrl ?? user?.picture ?? null;
 
   const accountType = profile?.isGoogleUser ? 'Google' : 'Email & password';
   const themeLabel =
@@ -117,9 +123,12 @@ export function ProfileScreen() {
       {/* Profile hero */}
       <Card style={styles.heroCard}>
         <View style={styles.heroRow}>
-          <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
-            <Text style={{ fontWeight: '700', color: colors.primaryText, fontSize: 22 }}>{initials}</Text>
-          </View>
+          <ProfileAvatar
+            name={profile?.fullName}
+            email={profile?.email || user?.email}
+            pictureUrl={pictureUrl}
+            size={80}
+          />
           <View style={styles.heroText}>
             <Text style={[styles.heroName, { color: colors.foreground }]}>
               {loading ? 'Loading…' : profile?.fullName || 'Your profile'}
@@ -255,13 +264,6 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontSize: 14, marginTop: 4, marginBottom: 4 },
   heroCard: { marginTop: 12 },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   heroText: { flex: 1, gap: 4 },
   heroName: { fontSize: 20, fontWeight: '700' },
   badge: {

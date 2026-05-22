@@ -27,12 +27,31 @@ function paramsFromUrl(url: string): URLSearchParams {
 }
 
 function userFromParams(params: URLSearchParams): User | null {
+  const picture =
+    params.get('picture') ??
+    params.get('profilePicture') ??
+    params.get('avatar') ??
+    params.get('photo') ??
+    undefined;
+
   const rawUser = params.get('user');
   if (rawUser) {
     try {
-      const parsed = JSON.parse(rawUser) as { id?: string | number; email?: string };
+      const parsed = JSON.parse(rawUser) as {
+        id?: string | number;
+        email?: string;
+        picture?: string;
+        profilePicture?: string;
+        avatar?: string;
+      };
       if (parsed.id != null && parsed.email) {
-        return { id: String(parsed.id), email: parsed.email };
+        const pic =
+          parsed.picture ?? parsed.profilePicture ?? parsed.avatar ?? picture ?? undefined;
+        return {
+          id: String(parsed.id),
+          email: parsed.email,
+          ...(pic ? { picture: pic } : {}),
+        };
       }
     } catch {
       /* ignore malformed JSON */
@@ -42,7 +61,11 @@ function userFromParams(params: URLSearchParams): User | null {
   const email = params.get('email');
   const id = params.get('id') ?? params.get('userId') ?? params.get('user_id');
   if (email && id != null) {
-    return { id: String(id), email };
+    return {
+      id: String(id),
+      email,
+      ...(picture ? { picture } : {}),
+    };
   }
 
   return null;

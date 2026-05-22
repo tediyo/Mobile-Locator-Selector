@@ -5,8 +5,10 @@ The mobile app cannot complete Google sign-in until the API redirects to the app
 ## Required redirect (after `/auth/google/callback`)
 
 ```
-twt-locator://auth/callback?access_token=JWT&id=USER_ID&email=user@example.com
+twt-locator://auth/callback?access_token=JWT&id=USER_ID&email=user@example.com&picture=https://lh3.googleusercontent.com/...
 ```
+
+Include Google's `picture` URL from the OAuth profile (same field stored on the user and returned from `GET /users/me` as `picture` or `profilePicture`).
 
 Same JWT as `POST /auth/login` (`access_token` field).
 
@@ -51,6 +53,9 @@ app.get(
         id: String(user.id),
         email: user.email,
       });
+      if (user.picture || user.profilePicture) {
+        q.set('picture', user.picture || user.profilePicture);
+      }
       return res.redirect(`${returnTo}?${q.toString()}`);
     }
 
