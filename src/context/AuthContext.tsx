@@ -7,6 +7,7 @@ import { resetToRoute } from '../navigation/navigationRef';
 export interface User {
   id: string;
   email: string;
+  picture?: string;
 }
 
 interface AuthContextType {
