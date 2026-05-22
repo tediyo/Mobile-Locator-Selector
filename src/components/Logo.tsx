@@ -1,5 +1,5 @@
 import { Text, StyleSheet } from 'react-native';
-import { useTheme } from '@/src/context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 /** Text logo matching web TWT branding when image assets are unavailable */
 export function Logo({ size = 'lg' }: { size?: 'sm' | 'lg' }) {

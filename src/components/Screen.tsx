@@ -1,6 +1,6 @@
 import { ScrollView, View, StyleSheet, type ViewProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/src/context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 export function Screen({
   scroll,

@@ -1,4 +1,4 @@
-import { API_URL } from '@/src/config/api';
+import { API_URL } from '../config/api';
 
 export async function apiFetch<T>(
   path: string,
@@ -20,8 +20,8 @@ export async function apiFetch<T>(
   } catch (err) {
     const hint =
       API_URL.includes('localhost') || API_URL.includes('127.0.0.1')
-        ? ' On a phone, set EXPO_PUBLIC_API_URL to your PC LAN IP in Mobile/.env'
-        : ' Ensure the backend is running and your firewall allows port 3001';
+        ? ' On a phone, set DEV_MACHINE_HOST in src/config/env.ts and USE_LOCAL_API=true'
+        : ' Check your network connection and that the API is reachable';
     const msg = err instanceof Error ? err.message : 'Network request failed';
     throw new Error(`Cannot reach ${url}. ${msg}.${hint}`);
   }
