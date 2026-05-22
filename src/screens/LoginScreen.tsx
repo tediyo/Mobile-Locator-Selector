@@ -78,7 +78,10 @@ export function LoginScreen() {
               setError('');
               setGoogleLoading(true);
               try {
-                await openGoogleSignIn();
+                const payload = await openGoogleSignIn();
+                if (payload) {
+                  await login(payload.token, payload.user);
+                }
               } catch (err) {
                 setError(err instanceof Error ? err.message : 'Could not open Google sign-in');
               } finally {

@@ -7,7 +7,10 @@ export function getGoogleAuthUrl(apiBase: string): string {
   const base = apiBase.replace(/\/$/, '');
   const params = new URLSearchParams({
     redirect_uri: OAUTH_REDIRECT_URI,
+    redirectUri: OAUTH_REDIRECT_URI,
+    return_to: OAUTH_REDIRECT_URI,
     platform: 'mobile',
+    mobile: 'true',
   });
   return `${base}/auth/google?${params.toString()}`;
 }

@@ -16,7 +16,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 export function SignupScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { loginAsGuest } = useAuth();
+  const { login, loginAsGuest } = useAuth();
   const { colors } = useTheme();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -68,7 +68,15 @@ export function SignupScreen() {
               <AppInput label="Password" value={password} onChangeText={setPassword} secureTextEntry />
               <PrimaryButton title="Sign Up" onPress={handleSubmit} loading={loading} />
               <Pressable
-                onPress={() => openGoogleSignIn().catch(() => {})}
+                onPress={async () => {
+                  setError('');
+                  try {
+                    const payload = await openGoogleSignIn();
+                    if (payload) await login(payload.token, payload.user);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Google sign-in failed');
+                  }
+                }}
                 style={[styles.outlineBtn, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }]}
               >
                 <Text style={{ color: colors.foreground }}>Sign up with Google</Text>
