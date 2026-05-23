@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Screen } from '../components/Screen';
@@ -6,15 +6,12 @@ import { Card } from '../components/ui/Card';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { ActivityBarChart, LocatorPieChart } from '../components/AnalyticsCharts';
 import { useAuth } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiFetch } from '../api/client';
 import {
-  type HistoryEntry,
-  type IndexedHistoryEntry,
   type DateFilter,
   type DatePreset,
   defaultDateFilter,
-  indexHistory,
   runAnalytics,
   activityChartTitle,
   toYMD,
@@ -23,25 +20,12 @@ import {
 export function OverviewScreen() {
   const { token, isGuest } = useAuth();
   const { colors } = useTheme();
-  const [indexedHistory, setIndexedHistory] = useState<IndexedHistoryEntry[]>([]);
-  const [fetching, setFetching] = useState(true);
+  const { indexedHistory, historyLoading } = useUserData();
   const initial = defaultDateFilter();
   const [draftFilter, setDraftFilter] = useState<DateFilter>(initial);
   const [appliedFilter, setAppliedFilter] = useState<DateFilter>(initial);
   const [showDatePicker, setShowDatePicker] = useState<'single' | 'from' | 'to' | null>(null);
   const dateFocusRef = useRef(0);
-
-  useEffect(() => {
-    if (!token) {
-      setFetching(false);
-      return;
-    }
-    (async () => {
-      const { ok, data } = await apiFetch<HistoryEntry[]>('/locator/history', { token });
-      if (ok) setIndexedHistory(indexHistory(data));
-      setFetching(false);
-    })();
-  }, [token]);
 
   const filterPending =
     draftFilter.preset !== appliedFilter.preset ||
@@ -62,6 +46,8 @@ export function OverviewScreen() {
     setAppliedFilter(next);
     dateFocusRef.current = 0;
   };
+
+  const showInitialLoader = historyLoading && indexedHistory.length === 0;
 
   if (isGuest) {
     return (
@@ -172,7 +158,7 @@ export function OverviewScreen() {
 
       <Card style={{ marginTop: 16, gap: 12 }}>
         <Text style={[styles.chartTitle, { color: colors.foreground }]}>{activityChartTitle(appliedFilter)}</Text>
-        {fetching ? (
+        {showInitialLoader ? (
           <ActivityIndicator color={colors.accent} />
         ) : filtered.length === 0 ? (
           <Text style={{ color: colors.muted, textAlign: 'center' }}>No data for this period</Text>
@@ -183,7 +169,11 @@ export function OverviewScreen() {
 
       <Card style={{ marginTop: 16, gap: 12, marginBottom: 24 }}>
         <Text style={[styles.chartTitle, { color: colors.foreground }]}>Locator Types</Text>
-        {fetching ? <ActivityIndicator color={colors.accent} /> : <LocatorPieChart data={charts.pieData} />}
+        {showInitialLoader ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : (
+          <LocatorPieChart data={charts.pieData} />
+        )}
       </Card>
     </Screen>
   );

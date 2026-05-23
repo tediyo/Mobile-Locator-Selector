@@ -18,6 +18,8 @@ export function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
+        lazy: true,
+        freezeOnBlur: true,
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.cardBg,

@@ -2,6 +2,7 @@ import 'react-native-reanimated';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'react-native';
 import { AuthProvider } from './src/context/AuthContext';
+import { UserDataProvider } from './src/context/UserDataContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { navigationRef } from './src/navigation/navigationRef';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -21,7 +22,9 @@ export default function App() {
     <ThemeProvider>
       <NavigationContainer ref={navigationRef}>
         <AuthProvider>
-          <AppShell />
+          <UserDataProvider>
+            <AppShell />
+          </UserDataProvider>
         </AuthProvider>
       </NavigationContainer>
     </ThemeProvider>
