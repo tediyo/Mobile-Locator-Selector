@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Screen } from '../components/Screen';
@@ -11,43 +12,25 @@ import { SettingRow } from '../components/profile/SettingRow';
 import { ThemeSelector } from '../components/profile/ThemeSelector';
 import { InfoRow } from '../components/profile/InfoRow';
 import { useAuth } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../config/api';
 import { apiFetch } from '../api/client';
 import { ProfileAvatar } from '../components/profile/ProfileAvatar';
 import { resolveProfilePictureUrl } from '../lib/profilePicture';
-
-interface ProfileData {
-  id: string;
-  fullName: string;
-  email: string;
-  phoneNumber?: string;
-  isGoogleUser?: boolean;
-  createdAt?: string;
-  pictureUrl?: string;
-}
-
-function withPictureUrl(data: ProfileData & Record<string, unknown>): ProfileData {
-  return {
-    ...data,
-    pictureUrl: resolveProfilePictureUrl(data) ?? data.pictureUrl,
-  };
-}
+import type { ProfileData } from '../context/UserDataContext';
 
 function formatMemberSince(iso?: string): string {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric', day: 'numeric' });
-  } catch {
-    return '—';
-  }
+  if (!iso) return 'Not available';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Not available';
+  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 export function ProfileScreen() {
   const { user, token, logout } = useAuth();
   const { colors, theme, themePreference } = useTheme();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, profileLoading, setProfileCache, refreshProfile } = useUserData();
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -55,21 +38,19 @@ export function ProfileScreen() {
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
+    if (profile) {
+      setFullName(profile.fullName || '');
+      setPhoneNumber(profile.phoneNumber || '');
     }
-    setLoading(true);
-    apiFetch<ProfileData & Record<string, unknown>>('/users/me', { token }).then(({ ok, data }) => {
-      if (ok) {
-        const next = withPictureUrl(data);
-        setProfile(next);
-        setFullName(next.fullName || '');
-        setPhoneNumber(next.phoneNumber || '');
+  }, [profile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (token && !profile?.createdAt) {
+        refreshProfile(true);
       }
-      setLoading(false);
-    });
-  }, [token]);
+    }, [token, profile?.createdAt, refreshProfile]),
+  );
 
   const handleSave = async () => {
     if (!token) return;
@@ -81,7 +62,13 @@ export function ProfileScreen() {
       body: JSON.stringify({ fullName, phoneNumber }),
     });
     if (ok) {
-      setProfile(withPictureUrl({ ...data, pictureUrl: profile?.pictureUrl }));
+      setProfileCache({
+        ...data,
+        createdAt: profile?.createdAt ?? data.createdAt,
+        pictureUrl:
+          profile?.pictureUrl ??
+          resolveProfilePictureUrl(data as unknown as Record<string, unknown>),
+      });
       setEditing(false);
       setMsg({ type: 'ok', text: 'Profile updated successfully.' });
     } else {
@@ -108,6 +95,7 @@ export function ProfileScreen() {
   const pictureUrl = profile?.pictureUrl ?? user?.picture ?? null;
 
   const accountType = profile?.isGoogleUser ? 'Google' : 'Email & password';
+  const memberSince = formatMemberSince(profile?.createdAt);
   const themeLabel =
     themePreference === 'system' ? `System (${theme})` : themePreference === 'dark' ? 'Dark' : 'Light';
 
@@ -131,18 +119,21 @@ export function ProfileScreen() {
           />
           <View style={styles.heroText}>
             <Text style={[styles.heroName, { color: colors.foreground }]}>
-              {loading ? 'Loading…' : profile?.fullName || 'Your profile'}
+              {profileLoading && !profile ? 'Loading…' : profile?.fullName || 'Your profile'}
             </Text>
             <Text style={{ color: colors.muted, fontSize: 14 }} numberOfLines={1}>
               {profile?.email || user?.email}
             </Text>
-            <View style={[styles.badge, { backgroundColor: colors.badgeBg, borderColor: colors.cardBorder }]}>
-              <Icon
-                name={profile?.isGoogleUser ? 'google' : 'envelope'}
-                size={11}
-                color={colors.badgeText}
-              />
-              <Text style={[styles.badgeText, { color: colors.badgeText }]}>{accountType}</Text>
+            <View style={styles.badgeRow}>
+              <View style={[styles.badge, { backgroundColor: colors.badgeBg, borderColor: colors.cardBorder }]}>
+                <Icon
+                  name={profile?.isGoogleUser ? 'google' : 'envelope'}
+                  size={11}
+                  color={colors.badgeText}
+                />
+                <Text style={[styles.badgeText, { color: colors.badgeText }]}>{accountType}</Text>
+              </View>
+              <Text style={[styles.memberSince, { color: colors.muted }]}>Member since {memberSince}</Text>
             </View>
           </View>
         </View>
@@ -174,6 +165,7 @@ export function ProfileScreen() {
               <InfoRow label="Full name" value={profile?.fullName || '—'} />
               <InfoRow label="Email" value={profile?.email || user?.email || '—'} />
               <InfoRow label="Phone" value={profile?.phoneNumber || '—'} />
+              <InfoRow label="Member since" value={memberSince} />
               <InfoRow label="User ID" value={profile?.id ? `#${profile.id.slice(-8)}` : '—'} />
               <Pressable onPress={() => setEditing(true)} style={styles.editLink}>
                 <Icon name="pencil" size={14} color={colors.accent} />
@@ -217,13 +209,13 @@ export function ProfileScreen() {
             disabled
             showChevron={false}
           />
-          <SettingRow
+          {/* <SettingRow
             icon="globe"
             label="API server"
             value={API_URL.replace(/^https?:\/\//, '').slice(0, 32)}
             disabled
             showChevron={false}
-          />
+          /> */}
         </View>
       </ProfileSection>
 
@@ -241,11 +233,11 @@ export function ProfileScreen() {
             <SettingRow
               icon="lock"
               label="Change password"
-              value="Use web app or contact admin"
+              value="Unavailable"
               onPress={() =>
                 Alert.alert(
                   'Change password',
-                  'Password changes are handled on the web dashboard for now.',
+                  'Unavailable',
                 )
               }
             />
@@ -266,18 +258,19 @@ const styles = StyleSheet.create({
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   heroText: { flex: 1, gap: 4 },
   heroName: { fontSize: 20, fontWeight: '700' },
+  badgeRow: { marginTop: 6, gap: 4 },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 6,
-    marginTop: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
   },
   badgeText: { fontSize: 11, fontWeight: '600' },
+  memberSince: { fontSize: 12 },
   infoBlock: { paddingHorizontal: 16, paddingBottom: 8 },
   editBlock: { padding: 16, gap: 12 },
   editLink: {

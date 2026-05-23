@@ -58,8 +58,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const colors = getColors(theme);
 
-  if (!mounted) return null;
-
   return (
     <ThemeContext.Provider value={{ theme, themePreference, colors, setThemePreference, toggleTheme, mounted }}>
       {children}

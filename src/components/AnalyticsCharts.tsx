@@ -1,3 +1,4 @@
+import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 import type { ActivityPoint, PiePoint } from '../lib/dashboard-analytics';
@@ -6,7 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 const chartWidth = Dimensions.get('window').width - 64;
 const BAR_HEIGHT = 200;
 
-export function ActivityBarChart({ data }: { data: ActivityPoint[] }) {
+export const ActivityBarChart = React.memo(function ActivityBarChart({ data }: { data: ActivityPoint[] }) {
   const { colors } = useTheme();
 
   if (!data.length) {
@@ -46,7 +47,7 @@ export function ActivityBarChart({ data }: { data: ActivityPoint[] }) {
       </Text>
     </View>
   );
-}
+});
 
 function DonutChart({
   data,
@@ -96,7 +97,7 @@ function DonutChart({
   );
 }
 
-export function LocatorPieChart({ data }: { data: PiePoint[] }) {
+export const LocatorPieChart = React.memo(function LocatorPieChart({ data }: { data: PiePoint[] }) {
   const { colors } = useTheme();
 
   if (!data.length) {
@@ -120,7 +121,7 @@ export function LocatorPieChart({ data }: { data: PiePoint[] }) {
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', overflow: 'hidden' },
