@@ -8,6 +8,7 @@ import { AppInput } from '../components/ui/AppInput';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { useAuth } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiFetch } from '../api/client';
 import { LOCATOR_TYPES, generateSnippet, type Framework } from '../lib/locator-snippets';
@@ -19,6 +20,7 @@ interface LocatorResult {
 
 export function LocatorScreen() {
   const { token } = useAuth();
+  const { invalidateHistory, refreshHistory } = useUserData();
   const { colors } = useTheme();
   const [url, setUrl] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -60,6 +62,8 @@ export function LocatorScreen() {
       if (ok) {
         if (Array.isArray(data)) {
           setResults(data);
+          invalidateHistory();
+          refreshHistory(true);
         } else if (data && typeof data === 'object' && 'warning' in data) {
           setAuthWarning(`${data.warning}\n${data.hint ?? ''}`);
           setShowAuth(true);

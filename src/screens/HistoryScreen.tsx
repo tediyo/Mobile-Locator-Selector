@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -7,27 +7,19 @@ import { Screen } from '../components/Screen';
 import { Card } from '../components/ui/Card';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { useAuth } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiFetch } from '../api/client';
-import type { HistoryEntry } from '../lib/dashboard-analytics';
 import type { RootStackParamList } from '../navigation/types';
 
 export function HistoryScreen() {
   const { token, isGuest } = useAuth();
   const { colors } = useTheme();
+  const { history, historyLoading } = useUserData();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!token || isGuest) return;
-    (async () => {
-      const { ok, data } = await apiFetch<HistoryEntry[]>('/locator/history', { token });
-      if (ok) setHistory(data);
-      setLoading(false);
-    })();
-  }, [token, isGuest]);
+  const entries = history ?? [];
+  const showInitialLoader = historyLoading && entries.length === 0;
 
   if (isGuest || !token) {
     return (
@@ -51,19 +43,19 @@ export function HistoryScreen() {
         <Text style={[styles.title, { color: colors.foreground }]}>Search History</Text>
         <View style={[styles.badge, { backgroundColor: colors.badgeBg, borderColor: colors.cardBorder }]}>
           <Text style={{ color: colors.badgeText, fontSize: 12, fontWeight: '600' }}>
-            {history.length} {history.length === 1 ? 'Search' : 'Searches'}
+            {entries.length} {entries.length === 1 ? 'Search' : 'Searches'}
           </Text>
         </View>
       </View>
 
-      {loading ? (
-        <Text style={{ color: colors.muted, textAlign: 'center', marginTop: 24 }}>Loading…</Text>
-      ) : history.length === 0 ? (
+      {showInitialLoader ? (
+        <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+      ) : entries.length === 0 ? (
         <Card>
           <Text style={{ color: colors.muted, textAlign: 'center' }}>No history yet. Generate locators on the Locator tab.</Text>
         </Card>
       ) : (
-        history.map((entry) => (
+        entries.map((entry) => (
           <Card key={entry._id} style={{ marginBottom: 10 }}>
             <Pressable onPress={() => setExpanded(expanded === entry._id ? null : entry._id)}>
               <View style={styles.entryRow}>
