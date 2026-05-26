@@ -6,6 +6,7 @@ import { HistoryScreen } from '../screens/HistoryScreen';
 import { LocatorScreen } from '../screens/LocatorScreen';
 import { OverviewScreen } from '../screens/OverviewScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { PerformanceStack } from './PerformanceStack';
 import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -41,6 +42,14 @@ export function MainTabs() {
         component={LocatorScreen}
         options={{
           tabBarIcon: ({ color }) => <Icon name="search" size={22} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Performance"
+        component={PerformanceStack}
+        options={{
+          tabBarIcon: ({ color }) => <Icon name="tachometer" size={22} color={color} />,
+          tabBarLabel: 'Perf',
         }}
       />
       {showAccountTabs && (

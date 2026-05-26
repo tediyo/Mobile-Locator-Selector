@@ -1,0 +1,212 @@
+import { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Share, Alert, Platform } from 'react-native';
+import { Card } from '../../components/ui/Card';
+import { ScoreRing } from '../../components/performance/ScoreRing';
+import { useTheme } from '../../context/ThemeContext';
+import type { PerformanceScanResult } from '../../lib/performance-types';
+import {
+  formatBytes,
+  formatMs,
+  severityBg,
+  severityColor,
+} from '../../lib/performance-format';
+import { generatePerformancePdf } from '../../lib/performance-pdf';
+
+type Props = {
+  result: PerformanceScanResult;
+  onDelete?: () => void;
+  onRerun?: () => void;
+};
+
+export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
+  const { colors } = useTheme();
+  const m = result.metrics;
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const shareReport = async () => {
+    const lines = [
+      `Performance: ${result.score}/100`,
+      result.url,
+      `TTFB ${formatMs(m.ttfbMs)} · LCP ${formatMs(m.lcpMs)} · Load ${formatMs(m.loadTimeMs)}`,
+      `${result.findings.length} findings`,
+    ];
+    await Share.share({ message: lines.join('\n') });
+  };
+
+  const downloadPdf = async () => {
+    if (generatingPdf) return;
+    setGeneratingPdf(true);
+    try {
+      const filePath = await generatePerformancePdf(result);
+      const fileUri = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
+
+      try {
+        await Share.share({
+          title: 'Performance Report PDF',
+          message: Platform.OS === 'android' ? `Saved to: ${filePath}` : undefined,
+          url: fileUri,
+        });
+      } catch {
+        // Some Android variants may reject file sharing but PDF is still generated.
+      }
+
+      Alert.alert('PDF ready', `Saved report to:\n${filePath}`);
+    } catch (err) {
+      Alert.alert('PDF failed', err instanceof Error ? err.message : 'Could not generate PDF report.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 16 }}>
+      <Card style={{ alignItems: 'center', gap: 12 }}>
+        <ScoreRing
+          score={result.score}
+          scoreMin={m.scoreMin}
+          scoreMax={m.scoreMax}
+        />
+        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
+          {m.pageTitle || result.url}
+        </Text>
+        <Text style={{ color: colors.muted, fontSize: 12 }} numberOfLines={2}>
+          {m.finalUrl || result.url}
+        </Text>
+        <View style={styles.metaRow}>
+          <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
+            {result.viewport}
+          </Text>
+          {m.runCount ? (
+            <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
+              {m.runCount} passes · median
+            </Text>
+          ) : null}
+          <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
+            {formatMs(result.durationMs)} scan
+          </Text>
+        </View>
+        <Text style={{ color: colors.muted, fontSize: 11, textAlign: 'center' }}>
+          Synthetic lab scan (server-side). Not your device network speed.
+        </Text>
+      </Card>
+
+      <Card style={{ gap: 10 }}>
+        <Text style={[styles.section, { color: colors.foreground }]}>Metrics</Text>
+        <View style={styles.metricGrid}>
+          <Metric label="TTFB" value={formatMs(m.ttfbMs)} colors={colors} />
+          <Metric label="FCP" value={formatMs(m.fcpMs)} colors={colors} />
+          <Metric label="LCP" value={formatMs(m.lcpMs)} colors={colors} />
+          <Metric label="Load" value={formatMs(m.loadTimeMs)} colors={colors} />
+          <Metric label="Requests" value={String(m.requestCount)} colors={colors} />
+          <Metric label="Transfer" value={formatBytes(m.totalTransferBytes)} colors={colors} />
+          <Metric label="DOM nodes" value={String(m.domElementCount)} colors={colors} />
+          <Metric label="Console err." value={String(m.consoleErrorCount)} colors={colors} />
+        </View>
+      </Card>
+
+      <Card style={{ gap: 10 }}>
+        <Text style={[styles.section, { color: colors.foreground }]}>
+          Findings ({result.findings.length})
+        </Text>
+        {result.findings.length === 0 ? (
+          <Text style={{ color: colors.muted }}>No findings.</Text>
+        ) : (
+          result.findings.map((f, i) => (
+            <View
+              key={`${f.code}-${i}`}
+              style={[styles.finding, { backgroundColor: severityBg(f.severity), borderColor: colors.cardBorder }]}
+            >
+              <View style={styles.findingHead}>
+                <Text style={[styles.sev, { color: severityColor(f.severity) }]}>{f.severity}</Text>
+                <Text style={{ color: colors.muted, fontSize: 10, textTransform: 'uppercase' }}>{f.category}</Text>
+              </View>
+              <Text style={{ color: colors.foreground, fontWeight: '600' }}>{f.title}</Text>
+              <Text style={{ color: colors.muted, fontSize: 13 }}>{f.message}</Text>
+              {f.evidence?.map((e, j) => (
+                <Text key={j} style={{ color: colors.mutedStrong, fontSize: 11, fontFamily: 'monospace' }}>
+                  {e}
+                </Text>
+              ))}
+            </View>
+          ))
+        )}
+      </Card>
+
+      {result.networkTop.length > 0 ? (
+        <Card style={{ gap: 8 }}>
+          <Text style={[styles.section, { color: colors.foreground }]}>Slowest resources</Text>
+          {result.networkTop.slice(0, 8).map((r, i) => (
+            <View key={i} style={[styles.netRow, { borderBottomColor: colors.cardBorder }]}>
+              <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
+                {r.resourceType} · {r.status}
+              </Text>
+              <Text style={{ color: colors.muted, fontSize: 11 }} numberOfLines={2}>
+                {r.url}
+              </Text>
+              <Text style={{ color: colors.muted, fontSize: 11 }}>
+                {formatMs(r.durationMs)} · {formatBytes(r.transferSize)}
+              </Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
+      <View style={styles.actions}>
+        {onRerun ? (
+          <Pressable onPress={onRerun} style={[styles.btn, { borderColor: colors.accent }]}>
+            <Text style={{ color: colors.accent, fontWeight: '600' }}>Re-run</Text>
+          </Pressable>
+        ) : null}
+        <Pressable onPress={shareReport} style={[styles.btn, { borderColor: colors.cardBorder }]}>
+          <Text style={{ color: colors.foreground, fontWeight: '600' }}>Share</Text>
+        </Pressable>
+        <Pressable
+          onPress={downloadPdf}
+          style={[styles.btn, { borderColor: colors.cardBorder, opacity: generatingPdf ? 0.7 : 1 }]}
+          disabled={generatingPdf}
+        >
+          <Text style={{ color: colors.foreground, fontWeight: '600' }}>
+            {generatingPdf ? 'Generating PDF…' : 'Download PDF'}
+          </Text>
+        </Pressable>
+        {onDelete && result._id ? (
+          <Pressable onPress={onDelete} style={[styles.btn, { borderColor: colors.error }]}>
+            <Text style={{ color: colors.error, fontWeight: '600' }}>Delete</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  colors,
+}: {
+  label: string;
+  value: string;
+  colors: { muted: string; foreground: string; surface: string };
+}) {
+  return (
+    <View style={[styles.metric, { backgroundColor: colors.surface }]}>
+      <Text style={{ color: colors.muted, fontSize: 10, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '700' }}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  title: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
+  pill: { fontSize: 11, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
+  section: { fontSize: 15, fontWeight: '700' },
+  metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  metric: { width: '47%', padding: 10, borderRadius: 8, gap: 2 },
+  finding: { padding: 12, borderRadius: 8, borderWidth: 1, gap: 4 },
+  findingHead: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  sev: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  netRow: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, gap: 2 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  btn: { flex: 1, minWidth: '30%', padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+});
