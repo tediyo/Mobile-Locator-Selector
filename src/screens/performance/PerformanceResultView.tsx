@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Share, Alert, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
 import { Card } from '../../components/ui/Card';
 import { ScoreRing } from '../../components/performance/ScoreRing';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,7 +9,6 @@ import {
   severityBg,
   severityColor,
 } from '../../lib/performance-format';
-import { generatePerformancePdf } from '../../lib/performance-pdf';
 
 type Props = {
   result: PerformanceScanResult;
@@ -21,7 +19,6 @@ type Props = {
 export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
   const { colors } = useTheme();
   const m = result.metrics;
-  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const shareReport = async () => {
     const lines = [
@@ -33,74 +30,53 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
     await Share.share({ message: lines.join('\n') });
   };
 
-  const downloadPdf = async () => {
-    if (generatingPdf) return;
-    setGeneratingPdf(true);
-    try {
-      const filePath = await generatePerformancePdf(result);
-      const fileUri = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
-
-      try {
-        await Share.share({
-          title: 'Performance Report PDF',
-          message: Platform.OS === 'android' ? `Saved to: ${filePath}` : undefined,
-          url: fileUri,
-        });
-      } catch {
-        // Some Android variants may reject file sharing but PDF is still generated.
-      }
-
-      Alert.alert('PDF ready', `Saved report to:\n${filePath}`);
-    } catch (err) {
-      Alert.alert('PDF failed', err instanceof Error ? err.message : 'Could not generate PDF report.');
-    } finally {
-      setGeneratingPdf(false);
-    }
-  };
-
   return (
     <View style={{ gap: 16 }}>
-      <Card style={{ alignItems: 'center', gap: 12 }}>
-        <ScoreRing
-          score={result.score}
-          scoreMin={m.scoreMin}
-          scoreMax={m.scoreMax}
-        />
-        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
-          {m.pageTitle || result.url}
-        </Text>
-        <Text style={{ color: colors.muted, fontSize: 12 }} numberOfLines={2}>
-          {m.finalUrl || result.url}
-        </Text>
-        <View style={styles.metaRow}>
-          <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
-            {result.viewport}
-          </Text>
-          {m.runCount ? (
-            <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
-              {m.runCount} passes · median
+      <Card style={{ paddingVertical: 16, gap: 16 }}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerScore}>
+            <ScoreRing score={result.score} scoreMin={m.scoreMin} scoreMax={m.scoreMax} />
+          </View>
+          <View style={styles.headerMeta}>
+            <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
+              {m.pageTitle || result.url}
             </Text>
-          ) : null}
-          <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
-            {formatMs(result.durationMs)} scan
-          </Text>
+            <Text style={{ color: colors.muted, fontSize: 12 }} numberOfLines={2}>
+              {m.finalUrl || result.url}
+            </Text>
+            <View style={[styles.metaRow, { marginTop: 8 }]}>
+              <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
+                Viewport: {result.viewport}
+              </Text>
+              {m.runCount ? (
+                <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
+                  {m.runCount} passes · median
+                </Text>
+              ) : null}
+              <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
+                Scan time: {formatMs(result.durationMs)}
+              </Text>
+            </View>
+            <Text style={{ color: colors.muted, fontSize: 11, marginTop: 6 }}>
+              Synthetic lab scan (server-side). Not your device network speed.
+            </Text>
+          </View>
         </View>
-        <Text style={{ color: colors.muted, fontSize: 11, textAlign: 'center' }}>
-          Synthetic lab scan (server-side). Not your device network speed.
-        </Text>
       </Card>
 
       <Card style={{ gap: 10 }}>
-        <Text style={[styles.section, { color: colors.foreground }]}>Metrics</Text>
+        <Text style={[styles.section, { color: colors.foreground }]}>Key metrics</Text>
         <View style={styles.metricGrid}>
           <Metric label="TTFB" value={formatMs(m.ttfbMs)} colors={colors} />
           <Metric label="FCP" value={formatMs(m.fcpMs)} colors={colors} />
           <Metric label="LCP" value={formatMs(m.lcpMs)} colors={colors} />
-          <Metric label="Load" value={formatMs(m.loadTimeMs)} colors={colors} />
+          <Metric label="Load time" value={formatMs(m.loadTimeMs)} colors={colors} />
           <Metric label="Requests" value={String(m.requestCount)} colors={colors} />
+          <Metric label="Failed" value={String(m.failedRequestCount)} colors={colors} />
           <Metric label="Transfer" value={formatBytes(m.totalTransferBytes)} colors={colors} />
+          <Metric label="3rd‑party" value={formatBytes(m.thirdPartyBytes)} colors={colors} />
           <Metric label="DOM nodes" value={String(m.domElementCount)} colors={colors} />
-          <Metric label="Console err." value={String(m.consoleErrorCount)} colors={colors} />
+          <Metric label="Console errors" value={String(m.consoleErrorCount)} colors={colors} />
         </View>
       </Card>
 
@@ -109,7 +85,7 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
           Findings ({result.findings.length})
         </Text>
         {result.findings.length === 0 ? (
-          <Text style={{ color: colors.muted }}>No findings.</Text>
+          <Text style={{ color: colors.muted }}>No findings for this run.</Text>
         ) : (
           result.findings.map((f, i) => (
             <View
@@ -160,15 +136,6 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
         <Pressable onPress={shareReport} style={[styles.btn, { borderColor: colors.cardBorder }]}>
           <Text style={{ color: colors.foreground, fontWeight: '600' }}>Share</Text>
         </Pressable>
-        <Pressable
-          onPress={downloadPdf}
-          style={[styles.btn, { borderColor: colors.cardBorder, opacity: generatingPdf ? 0.7 : 1 }]}
-          disabled={generatingPdf}
-        >
-          <Text style={{ color: colors.foreground, fontWeight: '600' }}>
-            {generatingPdf ? 'Generating PDF…' : 'Download PDF'}
-          </Text>
-        </Pressable>
         {onDelete && result._id ? (
           <Pressable onPress={onDelete} style={[styles.btn, { borderColor: colors.error }]}>
             <Text style={{ color: colors.error, fontWeight: '600' }}>Delete</Text>
@@ -197,7 +164,10 @@ function Metric({
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  headerRow: { flexDirection: 'row', gap: 16 },
+  headerScore: { justifyContent: 'center', alignItems: 'center' },
+  headerMeta: { flex: 1, gap: 4 },
+  title: { fontSize: 18, fontWeight: '700' },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   pill: { fontSize: 11, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
   section: { fontSize: 15, fontWeight: '700' },
