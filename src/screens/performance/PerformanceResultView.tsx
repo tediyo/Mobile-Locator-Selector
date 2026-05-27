@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Share, Alert, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
 import { Card } from '../../components/ui/Card';
 import { ScoreRing } from '../../components/performance/ScoreRing';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,7 +9,6 @@ import {
   severityBg,
   severityColor,
 } from '../../lib/performance-format';
-import { generatePerformancePdf } from '../../lib/performance-pdf';
 
 type Props = {
   result: PerformanceScanResult;
@@ -21,7 +19,6 @@ type Props = {
 export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
   const { colors } = useTheme();
   const m = result.metrics;
-  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const shareReport = async () => {
     const lines = [
@@ -31,31 +28,6 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
       `${result.findings.length} findings`,
     ];
     await Share.share({ message: lines.join('\n') });
-  };
-
-  const downloadPdf = async () => {
-    if (generatingPdf) return;
-    setGeneratingPdf(true);
-    try {
-      const filePath = await generatePerformancePdf(result);
-      const fileUri = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
-
-      try {
-        await Share.share({
-          title: 'Performance Report PDF',
-          message: Platform.OS === 'android' ? `Saved to: ${filePath}` : undefined,
-          url: fileUri,
-        });
-      } catch {
-        // Some Android variants may reject file sharing but PDF is still generated.
-      }
-
-      Alert.alert('PDF ready', `Saved report to:\n${filePath}`);
-    } catch (err) {
-      Alert.alert('PDF failed', err instanceof Error ? err.message : 'Could not generate PDF report.');
-    } finally {
-      setGeneratingPdf(false);
-    }
   };
 
   return (
@@ -159,15 +131,6 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
         ) : null}
         <Pressable onPress={shareReport} style={[styles.btn, { borderColor: colors.cardBorder }]}>
           <Text style={{ color: colors.foreground, fontWeight: '600' }}>Share</Text>
-        </Pressable>
-        <Pressable
-          onPress={downloadPdf}
-          style={[styles.btn, { borderColor: colors.cardBorder, opacity: generatingPdf ? 0.7 : 1 }]}
-          disabled={generatingPdf}
-        >
-          <Text style={{ color: colors.foreground, fontWeight: '600' }}>
-            {generatingPdf ? 'Generating PDF…' : 'Download PDF'}
-          </Text>
         </Pressable>
         {onDelete && result._id ? (
           <Pressable onPress={onDelete} style={[styles.btn, { borderColor: colors.error }]}>
