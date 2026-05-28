@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "react-native start --port 8082",
+    "start:reset": "react-native start --port 8082 --reset-cache",
     "android": "react-native run-android --port 8082",
     "android:apk": "cd android && gradlew.bat assembleDebug",
     "ios": "react-native run-ios"
@@ -16,8 +17,11 @@
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/native": "^7.1.8",
     "@react-navigation/native-stack": "^7.3.10",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "react": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-blob-util": "^0.24.9",
     "react-native-inappbrowser-reborn": "^3.7.1",
     "react-native-reanimated": "4.1.1",
     "react-native-safe-area-context": "^5.6.0",
