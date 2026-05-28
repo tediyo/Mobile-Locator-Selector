@@ -1,4 +1,5 @@
-import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
+import { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Share, Alert } from 'react-native';
 import { Card } from '../../components/ui/Card';
 import { ScoreRing } from '../../components/performance/ScoreRing';
 import { useTheme } from '../../context/ThemeContext';
@@ -9,6 +10,7 @@ import {
   severityBg,
   severityColor,
 } from '../../lib/performance-format';
+import { downloadPerformanceReportPdf } from '../../lib/performance-pdf';
 
 type Props = {
   result: PerformanceScanResult;
@@ -19,6 +21,7 @@ type Props = {
 export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
   const { colors } = useTheme();
   const m = result.metrics;
+  const [downloading, setDownloading] = useState(false);
 
   const shareReport = async () => {
     const lines = [
@@ -28,6 +31,22 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
       `${result.findings.length} findings`,
     ];
     await Share.share({ message: lines.join('\n') });
+  };
+
+  const downloadReport = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const path = await downloadPerformanceReportPdf(result);
+      Alert.alert('Report saved', `PDF saved and opened:\n${path}`);
+    } catch (err) {
+      Alert.alert(
+        'Download failed',
+        err instanceof Error ? err.message : 'Could not generate the PDF report.',
+      );
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -135,6 +154,15 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
         ) : null}
         <Pressable onPress={shareReport} style={[styles.btn, { borderColor: colors.cardBorder }]}>
           <Text style={{ color: colors.foreground, fontWeight: '600' }}>Share</Text>
+        </Pressable>
+        <Pressable
+          onPress={downloadReport}
+          disabled={downloading}
+          style={[styles.btn, { borderColor: colors.accent, opacity: downloading ? 0.7 : 1 }]}
+        >
+          <Text style={{ color: colors.accent, fontWeight: '600' }}>
+            {downloading ? 'Generating…' : 'Download report'}
+          </Text>
         </Pressable>
         {onDelete && result._id ? (
           <Pressable onPress={onDelete} style={[styles.btn, { borderColor: colors.error }]}>

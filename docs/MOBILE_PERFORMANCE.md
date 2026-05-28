@@ -45,7 +45,7 @@ Default viewport: **`desktop`** (1920×1080), same as the web app. Choose **mobi
 ## App UI
 
 - **Perf** tab → scan form, viewport, target-site auth  
-- **Results** → score ring, metrics, findings, network top, share/delete  
+- **Results** → score ring, metrics, findings, network top, share, **download report**, delete  
 - **History** → list (signed-in users)
 
 ## Code map
@@ -57,6 +57,23 @@ Default viewport: **`desktop`** (1920×1080), same as the web app. Choose **mobi
 | `src/api/performance.ts` | API client (180s scan timeout) |
 | `src/navigation/PerformanceStack.tsx` | Stack navigator |
 | `src/screens/performance/*` | Scan, result, history |
+| `src/lib/performance-pdf.ts` | PDF report (jsPDF + autotable) |
+
+## PDF report download
+
+Built on-device from the same `PerformanceScanResult` JSON (no backend PDF endpoint).
+
+**Dependencies:** `jspdf`, `jspdf-autotable`, `react-native-blob-util`
+
+**Install:**
+```bash
+npm install jspdf jspdf-autotable react-native-blob-util
+npm run android
+```
+
+**After install:** restart Metro with `npm run start:reset` if you see module resolution errors.
+
+Report includes: header, score ring, vitals bar chart, metrics/findings/network tables, page footers. Saved to Downloads (Android) or Documents (iOS), then opened in the system PDF viewer.
 
 ## UX notes
 
