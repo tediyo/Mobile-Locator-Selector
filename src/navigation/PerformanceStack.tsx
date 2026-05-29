@@ -3,11 +3,13 @@ import { useTheme } from '../context/ThemeContext';
 import { PerformanceScanScreen } from '../screens/performance/PerformanceScanScreen';
 import { PerformanceResultScreen } from '../screens/performance/PerformanceResultScreen';
 import { PerformanceHistoryScreen } from '../screens/performance/PerformanceHistoryScreen';
+import { PerformanceMetricsScreen } from '../screens/performance/PerformanceMetricsScreen';
 import type { PerformanceScanResult } from '../lib/performance-types';
 
 export type PerformanceStackParamList = {
   PerformanceScan: undefined;
   PerformanceResult: { result: PerformanceScanResult };
+  PerformanceMetrics: { result: PerformanceScanResult };
   PerformanceHistory: undefined;
 };
 
@@ -25,6 +27,7 @@ export function PerformanceStack() {
     >
       <Stack.Screen name="PerformanceScan" component={PerformanceScanScreen} />
       <Stack.Screen name="PerformanceResult" component={PerformanceResultScreen} />
+      <Stack.Screen name="PerformanceMetrics" component={PerformanceMetricsScreen} />
       <Stack.Screen name="PerformanceHistory" component={PerformanceHistoryScreen} />
     </Stack.Navigator>
   );
