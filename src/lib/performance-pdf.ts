@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import type { jsPDF } from 'jspdf';
 import type { PerformanceScanResult, NetworkResourceRow } from './performance-types';
 import { formatBytes, formatMs } from './performance-format';
 
@@ -314,7 +313,12 @@ async function openPdfFile(path: string): Promise<void> {
 
 /** Build PDF with tables + charts, save to device, open in PDF viewer. */
 export async function downloadPerformanceReportPdf(result: PerformanceScanResult): Promise<string> {
-  const doc = buildPerformancePdf(result, jsPDF, autoTable as AutoTableFn);
+  const [{ jsPDF }, autoTableModule] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+  const autoTable = autoTableModule.default as AutoTableFn;
+  const doc = buildPerformancePdf(result, jsPDF, autoTable);
   const path = await savePdfFile(doc, result);
   try {
     await openPdfFile(path);

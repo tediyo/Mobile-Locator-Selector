@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Share, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Card } from '../../components/ui/Card';
 import { ScoreRing } from '../../components/performance/ScoreRing';
 import { useTheme } from '../../context/ThemeContext';
+import type { PerformanceStackParamList } from '../../navigation/PerformanceStack';
 import type { PerformanceScanResult } from '../../lib/performance-types';
 import {
   formatBytes,
@@ -10,8 +13,6 @@ import {
   severityBg,
   severityColor,
 } from '../../lib/performance-format';
-import { downloadPerformanceReportPdf } from '../../lib/performance-pdf';
-
 type Props = {
   result: PerformanceScanResult;
   onDelete?: () => void;
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
+  const navigation = useNavigation<NativeStackNavigationProp<PerformanceStackParamList>>();
   const { colors } = useTheme();
   const m = result.metrics;
   const [downloading, setDownloading] = useState(false);
@@ -37,6 +39,7 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
     if (downloading) return;
     setDownloading(true);
     try {
+      const { downloadPerformanceReportPdf } = await import('../../lib/performance-pdf');
       const path = await downloadPerformanceReportPdf(result);
       Alert.alert('Report saved', `PDF saved and opened:\n${path}`);
     } catch (err) {
@@ -83,20 +86,22 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
         </View>
       </Card>
 
-      <Card style={{ gap: 10 }}>
-        <Text style={[styles.section, { color: colors.foreground }]}>Key metrics</Text>
-        <View style={styles.metricGrid}>
-          <Metric label="TTFB" value={formatMs(m.ttfbMs)} colors={colors} />
-          <Metric label="FCP" value={formatMs(m.fcpMs)} colors={colors} />
-          <Metric label="LCP" value={formatMs(m.lcpMs)} colors={colors} />
-          <Metric label="Load time" value={formatMs(m.loadTimeMs)} colors={colors} />
-          <Metric label="Requests" value={String(m.requestCount)} colors={colors} />
-          <Metric label="Failed" value={String(m.failedRequestCount)} colors={colors} />
-          <Metric label="Transfer" value={formatBytes(m.totalTransferBytes)} colors={colors} />
-          <Metric label="3rd‑party" value={formatBytes(m.thirdPartyBytes)} colors={colors} />
-          <Metric label="DOM nodes" value={String(m.domElementCount)} colors={colors} />
-          <Metric label="Console errors" value={String(m.consoleErrorCount)} colors={colors} />
+      <Card style={{ gap: 12 }}>
+        <Text style={[styles.section, { color: colors.foreground }]}>Quick summary</Text>
+        <View style={styles.summaryRow}>
+          <SummaryChip label="TTFB" value={formatMs(m.ttfbMs)} colors={colors} />
+          <SummaryChip label="LCP" value={formatMs(m.lcpMs)} colors={colors} />
+          <SummaryChip label="Load" value={formatMs(m.loadTimeMs)} colors={colors} />
         </View>
+        <Pressable
+          onPress={() => navigation.navigate('PerformanceMetrics', { result })}
+          style={[styles.metricsBtn, { borderColor: colors.accent, backgroundColor: colors.surface }]}
+        >
+          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 15 }}>Performance metrics</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>
+            View full table (timing, network, DOM, scan info)
+          </Text>
+        </Pressable>
       </Card>
 
       <Card style={{ gap: 10 }}>
@@ -174,7 +179,7 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
   );
 }
 
-function Metric({
+function SummaryChip({
   label,
   value,
   colors,
@@ -184,9 +189,9 @@ function Metric({
   colors: { muted: string; foreground: string; surface: string };
 }) {
   return (
-    <View style={[styles.metric, { backgroundColor: colors.surface }]}>
+    <View style={[styles.summaryChip, { backgroundColor: colors.surface }]}>
       <Text style={{ color: colors.muted, fontSize: 10, fontWeight: '600' }}>{label}</Text>
-      <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '700' }}>{value}</Text>
+      <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '700' }}>{value}</Text>
     </View>
   );
 }
@@ -199,8 +204,9 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   pill: { fontSize: 11, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
   section: { fontSize: 15, fontWeight: '700' },
-  metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  metric: { width: '47%', padding: 10, borderRadius: 8, gap: 2 },
+  summaryRow: { flexDirection: 'row', gap: 8 },
+  summaryChip: { flex: 1, padding: 10, borderRadius: 8, gap: 2, alignItems: 'center' },
+  metricsBtn: { padding: 14, borderRadius: 10, borderWidth: 1 },
   finding: { padding: 12, borderRadius: 8, borderWidth: 1, gap: 4 },
   findingHead: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sev: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },

@@ -8,7 +8,7 @@ react {
     debuggableVariants = []
 }
 
-def enableMinifyInReleaseBuilds = false
+def enableMinifyInReleaseBuilds = true
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
@@ -39,7 +39,9 @@ android {
         release {
             signingConfig signingConfigs.debug
             minifyEnabled enableMinifyInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // Keep false so vector-icon .ttf files in assets/ are not stripped.
+            shrinkResources false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
 }
@@ -53,4 +55,8 @@ dependencies {
     }
 }
 
+// Link vector icon fonts into the APK (FontAwesome only — all icons in the app use this family).
+project.ext.vectoricons = [
+    iconFontNames: [ "FontAwesome.ttf" ]
+]
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
