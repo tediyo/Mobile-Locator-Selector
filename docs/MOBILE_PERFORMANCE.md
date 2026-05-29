@@ -45,7 +45,7 @@ Default viewport: **`desktop`** (1920×1080), same as the web app. Choose **mobi
 ## App UI
 
 - **Perf** tab → scan form, viewport, target-site auth  
-- **Results** → score ring, metrics, findings, network top, share, **download report**, delete  
+- **Results** → score ring, quick summary, **Performance metrics** table screen, findings, network, share, download report, delete  
 - **History** → list (signed-in users)
 
 ## Code map
