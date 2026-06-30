@@ -12,6 +12,6 @@ dependencyResolutionManagement {
 extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   ex.autolinkLibrariesFromCommand()
 }
-rootProject.name = "TWTLocator"
+rootProject.name = "ATSLocator"
 include(":app")
 includeBuild("../node_modules/@react-native/gradle-plugin")
