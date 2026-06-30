@@ -1,17 +1,19 @@
-import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { Screen } from '../components/Screen';
-import { Card } from '../components/ui/Card';
-import { AppInput } from '../components/ui/AppInput';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
-import { DashboardHeader } from '../components/DashboardHeader';
-import { useAuth } from '../context/AuthContext';
-import { useUserData } from '../context/UserDataContext';
-import { useTheme } from '../context/ThemeContext';
+import { Picker } from '@react-native-picker/picker';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiFetch } from '../api/client';
+import { DashboardHeader } from '../components/DashboardHeader';
+import { Screen } from '../components/Screen';
+import { AppInput } from '../components/ui/AppInput';
+import { Card } from '../components/ui/Card';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useUserData } from '../context/UserDataContext';
 import { LOCATOR_TYPES, generateSnippet, type Framework } from '../lib/locator-snippets';
+import { monoFont } from '../theme/tokens';
 
 interface LocatorResult {
   tag: string;
@@ -121,24 +123,22 @@ export function LocatorScreen() {
 
       {results.length > 0 && (
         <View style={{ marginTop: 16, gap: 12 }}>
-          <View style={[styles.fwRow, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            {(['playwright', 'cypress', 'selenium'] as Framework[]).map((fw) => (
-              <Pressable
-                key={fw}
-                onPress={() => setFramework(fw)}
-                style={[styles.fwBtn, framework === fw && { backgroundColor: colors.accent }]}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '600', color: framework === fw ? colors.primaryText : colors.muted, textTransform: 'capitalize' }}>
-                  {fw}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <SegmentedControl
+            value={framework}
+            onChange={setFramework}
+            capitalize
+            dense
+            options={[
+              { value: 'playwright', label: 'Playwright' },
+              { value: 'cypress', label: 'Cypress' },
+              { value: 'selenium', label: 'Selenium' },
+            ]}
+          />
           {results.map((res, idx) => (
             <Card key={idx} style={{ gap: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={[styles.tag, { backgroundColor: colors.tagBg }]}>
-                  <Text style={{ color: colors.tagText, fontSize: 11, fontFamily: 'monospace' }}>{res.tag}</Text>
+                  <Text style={{ color: colors.tagText, fontSize: 11, fontFamily: monoFont }}>{res.tag}</Text>
                 </View>
                 <Pressable
                   onPress={() => copyText(res.locator, idx)}
@@ -149,12 +149,12 @@ export function LocatorScreen() {
                   </Text>
                 </Pressable>
               </View>
-              <Text style={{ fontFamily: 'monospace', fontSize: 12, color: colors.mutedStrong }} selectable>
+              <Text style={{ fontFamily: monoFont, fontSize: 12, color: colors.mutedStrong }} selectable>
                 {res.locator}
               </Text>
               <Text style={{ fontSize: 10, color: colors.muted, fontWeight: '700' }}>{framework.toUpperCase()} SNIPPET</Text>
               <ScrollView horizontal>
-                <Text style={{ fontFamily: 'monospace', fontSize: 10, color: colors.mutedStrong }} selectable>
+                <Text style={{ fontFamily: monoFont, fontSize: 10, color: colors.mutedStrong }} selectable>
                   {generateSnippet(locatorType, res.locator, framework, res.tag)}
                 </Text>
               </ScrollView>
@@ -169,8 +169,6 @@ export function LocatorScreen() {
 const styles = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
   pickerWrap: { borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
-  fwRow: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, padding: 2 },
-  fwBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
   tag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   copyBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginLeft: 'auto' },
 });

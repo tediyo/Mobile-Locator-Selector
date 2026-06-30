@@ -38,6 +38,13 @@ export type PerformanceMetrics = {
   scoreMax?: number;
 };
 
+export type PerformanceAuthWarning = {
+  warning: string;
+  redirectedTo: string;
+  hint: string;
+  loginError?: string;
+};
+
 export type PerformanceScanResult = {
   _id: string;
   url: string;
@@ -48,6 +55,7 @@ export type PerformanceScanResult = {
   networkTop: NetworkResourceRow[];
   durationMs: number;
   createdAt: string;
+  authWarning?: PerformanceAuthWarning;
 };
 
 export type PerformanceViewport = 'desktop' | 'mobile';

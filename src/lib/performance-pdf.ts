@@ -1,16 +1,24 @@
+import type { jsPDF } from 'jspdf';
 import { Platform } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
-import type { jsPDF } from 'jspdf';
-import type { PerformanceScanResult, NetworkResourceRow } from './performance-types';
 import { formatBytes, formatMs } from './performance-format';
+import { buildPerformanceMetricRows } from './performance-metrics-rows';
+import type { PerformanceScanResult } from './performance-types';
 
 type AutoTableFn = (doc: jsPDF, options: Record<string, unknown>) => void;
 
 type JsPDFWithTable = jsPDF & { lastAutoTable?: { finalY: number } };
 
-function truncate(text: string, max = 80): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1)}…`;
+type HookData = {
+  section: 'head' | 'body' | 'foot';
+  column: { index: number };
+  row: { index: number };
+  cell: { styles: Record<string, unknown> };
+};
+
+function truncate(str: string, max: number): string {
+  if (str.length <= max) return str;
+  return str.slice(0, max - 3) + '...';
 }
 
 function scoreRgb(score: number): [number, number, number] {
@@ -19,44 +27,45 @@ function scoreRgb(score: number): [number, number, number] {
   return [239, 68, 68];
 }
 
-function sanitizeFilePart(value: string): string {
-  return value.replace(/[^a-zA-Z0-9-_]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '');
+  const bigint = parseInt(clean, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return [r, g, b];
 }
 
-function groupResourceTypes(networkTop: NetworkResourceRow[]): Array<{ label: string; value: number }> {
-  const totals = new Map<string, number>();
-  for (const row of networkTop) {
-    const key = row.resourceType || 'other';
-    totals.set(key, (totals.get(key) ?? 0) + row.transferSize);
-  }
-  return [...totals.entries()]
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 8);
-}
-
-function drawScoreRing(
+/** Donut-style score chart drawn directly with jsPDF primitives. */
+function drawScoreChart(
   doc: jsPDF,
-  cx: number,
-  cy: number,
-  radius: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
   score: number,
-  rgb: [number, number, number],
   scoreMin?: number,
   scoreMax?: number,
 ) {
-  doc.setDrawColor(220, 220, 220);
-  doc.setLineWidth(2.2);
+  const [r, g, b] = scoreRgb(score);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const radius = Math.min(w, h) / 2 - 4;
+  const lineW = 4;
+
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(lineW);
   doc.circle(cx, cy, radius, 'S');
 
-  const startDeg = -90;
-  const sweep = Math.max(0, Math.min(360, (score / 100) * 360));
-  doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
-  doc.setLineWidth(2.6);
-  const steps = Math.max(12, Math.ceil(sweep / 4));
+  const start = -Math.PI / 2;
+  const end = start + (score / 100) * Math.PI * 2;
+  doc.setDrawColor(r, g, b);
+  doc.setLineWidth(lineW);
+  doc.setLineCap('round');
+  const steps = Math.max(12, Math.ceil((score / 100) * 360 / 4));
   for (let i = 0; i < steps; i += 1) {
-    const a1 = ((startDeg + (sweep * i) / steps) * Math.PI) / 180;
-    const a2 = ((startDeg + (sweep * (i + 1)) / steps) * Math.PI) / 180;
+    const a1 = start + (i / steps) * (end - start);
+    const a2 = start + ((i + 1) / steps) * (end - start);
     doc.line(
       cx + radius * Math.cos(a1),
       cy + radius * Math.sin(a1),
@@ -64,20 +73,23 @@ function drawScoreRing(
       cy + radius * Math.sin(a2),
     );
   }
+  doc.setLineCap('butt');
 
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text(String(Math.round(score)), cx, cy + 1, { align: 'center' });
+  doc.setFontSize(14);
+  doc.text(String(score), cx, cy - 1, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text('Score', cx, cy + 7, { align: 'center' });
-  if (scoreMin != null && scoreMax != null) {
-    doc.setFontSize(7);
-    doc.text(`${Math.round(scoreMin)}–${Math.round(scoreMax)}`, cx, cy + 12, { align: 'center' });
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Score', cx, cy + 5, { align: 'center' });
+  if (scoreMin != null && scoreMax != null && scoreMin !== scoreMax) {
+    doc.setFontSize(6);
+    doc.text(`${scoreMin}–${scoreMax}`, cx, cy + 9, { align: 'center' });
   }
 }
 
+/** Bar chart drawn directly with jsPDF primitives. */
 function drawBarChart(
   doc: jsPDF,
   x: number,
@@ -85,50 +97,146 @@ function drawBarChart(
   width: number,
   height: number,
   title: string,
-  items: Array<{ label: string; value: number }>,
-  unit: 'ms' | 'bytes',
+  labels: string[],
+  values: number[],
+  colors: string[],
+  opts?: { unit?: string },
 ) {
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
   doc.text(title, x, y);
 
-  const chartTop = y + 4;
-  const chartLeft = x + 10;
-  const chartBottom = chartTop + height - 12;
-  const chartHeight = chartBottom - chartTop - 8;
-  const chartWidth = width - 14;
-  const max = Math.max(...items.map((i) => i.value), 1);
-  const slot = chartWidth / Math.max(items.length, 1);
-  const barWidth = Math.min(18, slot - 6);
+  const padL = 14;
+  const padR = 6;
+  const padT = 12;
+  const padB = 12;
+  const chartW = width - padL - padR;
+  const chartH = height - padT - padB;
+  const maxVal = Math.max(...values, 1) * 1.15;
+  const barGap = 4;
+  const barW = (chartW - barGap * (labels.length - 1)) / labels.length;
 
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.3);
-  doc.line(chartLeft, chartTop + 4, chartLeft, chartBottom);
-  doc.line(chartLeft, chartBottom, chartLeft + chartWidth, chartBottom);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  for (let i = 0; i <= 4; i += 1) {
+    const gy = y + padT + (chartH * i) / 4;
+    doc.line(x + padL, gy, x + padL + chartW, gy);
+    const val = maxVal * (1 - i / 4);
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(5);
+    const label =
+      opts?.unit === 'ms'
+        ? val >= 1000
+          ? `${(val / 1000).toFixed(1)}s`
+          : `${Math.round(val)}ms`
+        : String(Math.round(val));
+    doc.text(label, x + 2, gy + 1.5);
+  }
 
-  items.forEach((item, index) => {
-    const barH = Math.max(2, (item.value / max) * chartHeight);
-    const bx = chartLeft + index * slot + (slot - barWidth) / 2;
-    const by = chartBottom - barH;
-    doc.setFillColor(37, 99, 235);
-    doc.rect(bx, by, barWidth, barH, 'F');
-    doc.setFontSize(7);
+  labels.forEach((label, i) => {
+    const v = values[i];
+    const barH = Math.max(1, (v / maxVal) * chartH);
+    const bx = x + padL + i * (barW + barGap);
+    const by = y + padT + chartH - barH;
+    const c = hexToRgb(colors[i] ?? '#f59e0b');
+    doc.setFillColor(c[0], c[1], c[2]);
+    doc.rect(bx, by, barW, barH, 'F');
+
     doc.setTextColor(51, 65, 85);
-    const valueLabel = unit === 'bytes' ? formatBytes(item.value) : `${Math.round(item.value)} ms`;
-    doc.text(valueLabel, bx + barWidth / 2, by - 1.5, { align: 'center' });
-    doc.text(item.label, bx + barWidth / 2, chartBottom + 4, { align: 'center' });
+    doc.setFontSize(5);
+    const display =
+      opts?.unit === 'ms'
+        ? v >= 1000
+          ? `${(v / 1000).toFixed(1)}s`
+          : `${Math.round(v)}ms`
+        : String(Math.round(v));
+    doc.text(display, bx + barW / 2, by - 2, { align: 'center' });
+    doc.text(label, bx + barW / 2, y + height - 4, { align: 'center' });
   });
 }
 
-function addFooters(doc: jsPDF) {
-  const pageCount = doc.getNumberOfPages();
-  for (let page = 1; page <= pageCount; page += 1) {
-    doc.setPage(page);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Generated by TWT Locator · Page ${page} of ${pageCount}`, 105, 287, { align: 'center' });
+/** Resource type distribution. */
+function drawResourceTypeChart(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  rows: { resourceType: string; transferSize: number }[],
+) {
+  const byType = new Map<string, number>();
+  for (const r of rows) {
+    byType.set(r.resourceType, (byType.get(r.resourceType) ?? 0) + r.transferSize);
+  }
+  const labels = [...byType.keys()].slice(0, 8);
+  const values = labels.map((l) => byType.get(l) ?? 0);
+  const palette = ['#f59e0b', '#3b82f6', '#22c55e', '#a855f7', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+  drawBarChart(doc, x, y, width, height, 'Transfer by resource type (bytes)', labels, values, palette);
+}
+
+type RGB = [number, number, number];
+
+const INK: RGB = [15, 23, 42];
+const SLATE: RGB = [71, 85, 105];
+const MUTED: RGB = [148, 163, 184];
+const BORDER: RGB = [226, 232, 240];
+const PANEL: RGB = [248, 250, 252];
+const AMBER: RGB = [245, 158, 11];
+
+const GOOD: RGB = [22, 163, 74];
+const WARN: RGB = [180, 83, 9];
+const CRIT: RGB = [220, 38, 38];
+
+function statusColor(status: string): RGB {
+  switch (status) {
+    case 'good':
+      return GOOD;
+    case 'warning':
+      return WARN;
+    case 'critical':
+      return CRIT;
+    default:
+      return SLATE;
+  }
+}
+
+function thresholdColor(value: number | null | undefined, good: number, warn: number): RGB {
+  if (value == null || Number.isNaN(value)) return SLATE;
+  if (value <= good) return GOOD;
+  if (value <= warn) return WARN;
+  return CRIT;
+}
+
+function gradeFor(score: number): { label: string; verdict: string } {
+  if (score >= 80) {
+    return {
+      label: 'Good',
+      verdict: 'This page delivers a strong performance experience, with key metrics inside their recommended targets.',
+    };
+  }
+  if (score >= 60) {
+    return {
+      label: 'Needs improvement',
+      verdict: 'Performance is acceptable, but several metrics exceed their recommended thresholds and are worth optimising.',
+    };
+  }
+  return {
+    label: 'Poor',
+    verdict: 'Performance issues are materially affecting the user experience and should be prioritised for remediation.',
+  };
+}
+
+function sanitizeFilePart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9-_]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
+function extractHostname(url: string): string {
+  try {
+    const match = url.match(/^https?:\/\/([^/?#]+)/);
+    return match?.[1] ?? 'site';
+  } catch {
+    return 'site';
   }
 }
 
@@ -137,158 +245,319 @@ function buildPerformancePdf(
   jsPDFCtor: typeof import('jspdf').jsPDF,
   autoTable: AutoTableFn,
 ): jsPDF {
-  const doc = new jsPDFCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const margin = 14;
-  const pageW = 210;
   const m = result.metrics;
-  let y = 18;
+  const doc = new jsPDFCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+  const contentW = pageW - margin * 2;
 
-  doc.setFillColor(245, 158, 11);
-  doc.rect(0, 0, pageW, 22, 'F');
-  doc.setTextColor(255, 255, 255);
+  const fill = (c: RGB) => doc.setFillColor(c[0], c[1], c[2]);
+  const stroke = (c: RGB) => doc.setDrawColor(c[0], c[1], c[2]);
+  const ink = (c: RGB) => doc.setTextColor(c[0], c[1], c[2]);
+  const lastY = () => (doc as JsPDFWithTable).lastAutoTable?.finalY ?? margin;
+
+  const ensureSpace = (yy: number, needed: number): number => {
+    if (yy + needed > pageH - 16) {
+      doc.addPage();
+      return margin + 4;
+    }
+    return yy;
+  };
+
+  const sectionTitle = (yy: number, text: string): number => {
+    fill(AMBER);
+    doc.rect(margin, yy - 3.1, 1.6, 4, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    ink(INK);
+    doc.text(text, margin + 4, yy);
+    return yy + 5.5;
+  };
+
+  const drawChip = (x: number, yy: number, text: string, bg: RGB, fg: RGB): number => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    const w = doc.getTextWidth(text) + 6;
+    fill(bg);
+    doc.roundedRect(x, yy - 3.7, w, 5.6, 1.3, 1.3, 'F');
+    ink(fg);
+    doc.text(text, x + 3, yy);
+    return x + w + 3;
+  };
+
+  const generatedAt = new Date();
+  const scanDate = new Date(result.createdAt);
+
+  // ── Header band ──
+  fill(INK);
+  doc.rect(0, 0, pageW, 26, 'F');
+  fill(AMBER);
+  doc.rect(0, 26, pageW, 1.4, 'F');
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('TWT Locator Performance Report', margin, 14);
+  ink(AMBER);
+  doc.text('ATS', margin, 13);
+  const brandW = doc.getTextWidth('ATS');
+  doc.setTextColor(255, 255, 255);
+  doc.text('  Performance Report', margin + brandW, 13);
 
-  y = 30;
-  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(203, 213, 225);
+  doc.text(`Generated ${generatedAt.toLocaleString()}`, pageW - margin, 12, { align: 'right' });
+  const scanId = result._id ? `#${result._id.slice(-8).toUpperCase()}` : '—';
+  doc.text(`Scan ${scanId}`, pageW - margin, 18, { align: 'right' });
+
+  let y = 37;
+
+  // ── Page identity ──
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text(truncate(m.pageTitle || 'Performance scan', 70), margin, y);
+  ink(INK);
+  const titleLines = doc.splitTextToSize(m.pageTitle || 'Page scan', contentW) as string[];
+  doc.text(titleLines[0], margin, y);
+  y += 5.5;
 
-  y += 6;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  const metaLines = [
-    `URL: ${truncate(result.url, 95)}`,
-    `Final URL: ${truncate(m.finalUrl || result.url, 95)}`,
-    `Scanned: ${new Date(result.createdAt || Date.now()).toLocaleString()}`,
-    `Viewport: ${result.viewport} · Scan duration: ${formatMs(result.durationMs)}`,
-    m.runCount ? `Stable scan: ${m.runCount} passes (median metrics)` : 'Stable scan: 3 passes (median metrics)',
-  ];
-  for (const line of metaLines) {
-    doc.text(line, margin, y);
-    y += 4.5;
-  }
+  doc.setFontSize(8.5);
+  ink(SLATE);
+  const urlLines = (doc.splitTextToSize(m.finalUrl || result.url, contentW) as string[]).slice(0, 2);
+  doc.text(urlLines, margin, y);
+  y += urlLines.length * 4 + 2.5;
 
-  drawScoreRing(doc, pageW - margin - 21, 36, 18, result.score, scoreRgb(result.score), m.scoreMin, m.scoreMax);
+  doc.setFontSize(8);
+  ink(MUTED);
+  doc.text(
+    `Scanned ${scanDate.toLocaleString()}    ·    Viewport ${result.viewport}    ·    ${m.runCount ?? 3}-run median    ·    Duration ${(result.durationMs / 1000).toFixed(0)}s`,
+    margin,
+    y,
+  );
+  y += 7;
 
-  y += 4;
-  const chartW = pageW - margin * 2;
-  const chartH = 52;
-  drawBarChart(doc, margin, y, chartW, chartH, 'Core Web Vitals (ms)', [
-    { label: 'TTFB', value: m.ttfbMs ?? 0 },
-    { label: 'FCP', value: m.fcpMs ?? 0 },
-    { label: 'LCP', value: m.lcpMs ?? 0 },
-    { label: 'Load', value: m.loadTimeMs ?? 0 },
-  ], 'ms');
-  y += chartH + 6;
+  // ── Executive summary panel ──
+  const panelH = 44;
+  stroke(BORDER);
+  fill(PANEL);
+  doc.roundedRect(margin, y, contentW, panelH, 2.5, 2.5, 'FD');
 
-  autoTable(doc, {
-    startY: y,
-    head: [['Metric', 'Value', 'Notes']],
-    body: [
-      ['TTFB', formatMs(m.ttfbMs), 'Time to first byte'],
-      ['FCP', formatMs(m.fcpMs), 'First contentful paint'],
-      ['LCP', formatMs(m.lcpMs), 'Largest contentful paint'],
-      ['DOM complete', formatMs(m.domCompleteMs), 'DOMContentLoaded end'],
-      ['Load time', formatMs(m.loadTimeMs), 'Window load event'],
-      ['Requests', String(m.requestCount), 'Total network requests'],
-      ['Failed requests', String(m.failedRequestCount), 'Non-success responses'],
-      ['Transfer size', formatBytes(m.totalTransferBytes), 'Total bytes transferred'],
-      ['Third-party bytes', formatBytes(m.thirdPartyBytes), 'Third-party transfer'],
-      ['DOM nodes', String(m.domElementCount), 'DOM element count'],
-      ['Console errors', String(m.consoleErrorCount), 'Console error count'],
-    ],
-    styles: { fontSize: 9, cellPadding: 2.5 },
-    headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
-    margin: { left: margin, right: margin },
-  });
+  drawScoreChart(doc, margin + 4, y + 5, 34, 34, result.score, m.scoreMin, m.scoreMax);
 
-  const docWithTable = doc as JsPDFWithTable;
-  y = docWithTable.lastAutoTable?.finalY ?? y + 40;
-  y += 8;
-
-  const resourceItems = groupResourceTypes(result.networkTop);
-  if (resourceItems.length > 0) {
-    if (y > 220) {
-      doc.addPage();
-      y = margin;
-    }
-    drawBarChart(doc, margin, y, chartW, chartH, 'Resource types (transfer size)', resourceItems, 'bytes');
-    y += chartH + 8;
-  }
-
-  if (y > 220) {
-    doc.addPage();
-    y = margin;
-  }
+  const grade = gradeFor(result.score);
+  const scoreCol = scoreRgb(result.score);
+  const tx = margin + 46;
+  let ty = y + 11;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(`Findings (${result.findings.length})`, margin, y);
-  y += 5;
+  ink(scoreCol);
+  doc.text(`${grade.label} · ${result.score}/100`, tx, ty);
+  ty += 5.5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.2);
+  ink(SLATE);
+  const verdictLines = doc.splitTextToSize(grade.verdict, contentW - 46 - 6) as string[];
+  doc.text(verdictLines, tx, ty);
 
-  if (result.findings.length === 0) {
+  const crit = result.findings.filter((f) => f.severity === 'critical').length;
+  const warn = result.findings.filter((f) => f.severity === 'warning').length;
+  const info = result.findings.filter((f) => f.severity === 'info').length;
+  const chipY = y + panelH - 7;
+  let chipX = tx;
+  chipX = drawChip(chipX, chipY, `${crit} Critical`, [254, 226, 226], [185, 28, 28]);
+  chipX = drawChip(chipX, chipY, `${warn} Warning`, [254, 243, 199], [180, 83, 9]);
+  drawChip(chipX, chipY, `${info} Info`, [224, 231, 255], [55, 48, 163]);
+
+  y += panelH + 8;
+
+  // ── KPI tiles ──
+  const kpis: { label: string; value: string; hint: string; color: RGB }[] = [
+    { label: 'TTFB', value: formatMs(m.ttfbMs), hint: 'Target < 600 ms', color: thresholdColor(m.ttfbMs, 600, 1500) },
+    { label: 'FCP', value: formatMs(m.fcpMs), hint: 'First content', color: thresholdColor(m.fcpMs, 1800, 3000) },
+    { label: 'LCP', value: formatMs(m.lcpMs), hint: 'Target < 2.5 s', color: thresholdColor(m.lcpMs, 2500, 4000) },
+    { label: 'LOAD', value: formatMs(m.loadTimeMs), hint: 'Load event', color: thresholdColor(m.loadTimeMs, 5000, 8000) },
+    { label: 'REQUESTS', value: String(m.requestCount), hint: `${m.failedRequestCount} failed`, color: thresholdColor(m.requestCount, 100, 150) },
+    { label: 'TRANSFER', value: formatBytes(m.totalTransferBytes), hint: `${m.domElementCount} DOM nodes`, color: thresholdColor(m.totalTransferBytes, 3 * 1024 * 1024, 6 * 1024 * 1024) },
+  ];
+  const gap = 3;
+  const tileW = (contentW - gap * (kpis.length - 1)) / kpis.length;
+  const tileH = 19;
+  kpis.forEach((k, i) => {
+    const kx = margin + i * (tileW + gap);
+    stroke(BORDER);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(kx, y, tileW, tileH, 2, 2, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.3);
+    ink(MUTED);
+    doc.text(k.label, kx + 3, y + 5);
+    doc.setFontSize(11);
+    ink(k.color);
+    doc.text(k.value, kx + 3, y + 11.5);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('No findings for this run.', margin, y + 4);
-  } else {
+    doc.setFontSize(5.8);
+    ink(MUTED);
+    const hint = (doc.splitTextToSize(k.hint, tileW - 5) as string[])[0] ?? '';
+    doc.text(hint, kx + 3, y + 16);
+  });
+  y += tileH + 10;
+
+  // ── Core timing chart ──
+  y = ensureSpace(y, 60);
+  drawBarChart(
+    doc,
+    margin,
+    y,
+    contentW,
+    52,
+    'Core timing metrics (median)',
+    ['TTFB', 'FCP', 'LCP', 'Load'],
+    [m.ttfbMs ?? 0, m.fcpMs ?? 0, m.lcpMs ?? 0, m.loadTimeMs ?? 0],
+    ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7'],
+    { unit: 'ms' },
+  );
+  y += 58;
+
+  // ── Detailed metrics table ──
+  const rows = buildPerformanceMetricRows(result);
+  y = ensureSpace(y, 40);
+  y = sectionTitle(y, 'Detailed performance metrics');
+  autoTable(doc, {
+    startY: y,
+    head: [['Metric', 'Value', 'Assessment']],
+    body: rows.map((r) => [r.metric, r.value, r.notes]),
+    theme: 'plain',
+    headStyles: { fillColor: INK, textColor: 255, fontStyle: 'bold', fontSize: 8, cellPadding: 2.4 },
+    bodyStyles: { fontSize: 8, cellPadding: 2.2, textColor: SLATE },
+    alternateRowStyles: { fillColor: PANEL },
+    columnStyles: {
+      0: { cellWidth: 64, fontStyle: 'bold', textColor: INK },
+      1: { cellWidth: 32 },
+      2: { cellWidth: 'auto' },
+    },
+    didParseCell: (data: HookData) => {
+      if (data.section === 'body' && data.column.index === 1) {
+        const st = rows[data.row.index]?.status ?? 'neutral';
+        data.cell.styles.textColor = statusColor(st);
+        data.cell.styles.fontStyle = 'bold';
+      }
+    },
+    margin: { left: margin, right: margin },
+  });
+  y = lastY() + 5.5;
+
+  // ── Status legend ──
+  const legend: { t: string; c: RGB }[] = [
+    { t: 'Good', c: GOOD },
+    { t: 'Needs attention', c: WARN },
+    { t: 'Critical', c: CRIT },
+  ];
+  let lx = margin;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  legend.forEach((lg) => {
+    fill(lg.c);
+    doc.circle(lx + 1, y - 1, 1, 'F');
+    ink(SLATE);
+    doc.text(lg.t, lx + 3.5, y);
+    lx += doc.getTextWidth(lg.t) + 12;
+  });
+  y += 9;
+
+  // ── Resource type chart ──
+  if (result.networkTop.length > 0) {
+    const resourceChartY = ensureSpace(y, 58);
+    drawResourceTypeChart(doc, margin, resourceChartY, contentW, 52, result.networkTop);
+    y = resourceChartY + 58;
+  }
+
+  // ── Findings ──
+  if (result.findings.length > 0) {
+    y = ensureSpace(y, 30);
+    y = sectionTitle(y, `Bottleneck findings (${result.findings.length})`);
     autoTable(doc, {
       startY: y,
       head: [['Severity', 'Category', 'Issue', 'Details']],
       body: result.findings.map((f) => [
-        f.severity,
+        f.severity.toUpperCase(),
         f.category,
-        truncate(f.title, 45),
-        truncate(f.message, 70),
+        f.title,
+        truncate(f.message + (f.evidence?.length ? ` | ${f.evidence.join('; ')}` : ''), 130),
       ]),
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
+      theme: 'striped',
+      headStyles: { fillColor: INK, textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak', textColor: SLATE },
+      alternateRowStyles: { fillColor: PANEL },
+      columnStyles: {
+        0: { cellWidth: 20, fontStyle: 'bold' },
+        1: { cellWidth: 24 },
+        2: { cellWidth: 42, textColor: INK, fontStyle: 'bold' },
+        3: { cellWidth: 'auto' },
+      },
+      didParseCell: (data: HookData) => {
+        if (data.section === 'body' && data.column.index === 0) {
+          const sev = result.findings[data.row.index]?.severity;
+          data.cell.styles.textColor =
+            sev === 'critical' ? CRIT : sev === 'warning' ? WARN : [55, 48, 163];
+        }
+      },
       margin: { left: margin, right: margin },
     });
-    y = docWithTable.lastAutoTable?.finalY ?? y + 20;
+    y = lastY() + 8;
   }
 
-  doc.addPage();
-  y = margin;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text(`Network resources (${result.networkTop.length})`, margin, y);
-  y += 5;
-
-  if (result.networkTop.length === 0) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('No network resources captured.', margin, y + 4);
-  } else {
+  // ── Network resources ──
+  if (result.networkTop.length > 0) {
+    doc.addPage();
+    y = margin + 4;
+    y = sectionTitle(y, 'Slowest network resources');
     autoTable(doc, {
       startY: y,
       head: [['URL', 'Type', 'Status', 'Duration', 'Size']],
       body: result.networkTop.map((r) => [
-        truncate(r.url, 55),
+        truncate(r.url, 78),
         r.resourceType,
         String(r.status),
         formatMs(r.durationMs),
         formatBytes(r.transferSize),
       ]),
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
+      theme: 'plain',
+      headStyles: { fillColor: INK, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+      bodyStyles: { fontSize: 6.8, cellPadding: 1.8, overflow: 'linebreak', textColor: SLATE },
+      alternateRowStyles: { fillColor: PANEL },
+      columnStyles: {
+        0: { cellWidth: 78, textColor: INK },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 16 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 'auto' },
+      },
       margin: { left: margin, right: margin },
     });
   }
 
-  addFooters(doc);
+  // ── Footer on every page ──
+  const hostname = extractHostname(result.url);
+
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    stroke(BORDER);
+    doc.setLineWidth(0.2);
+    doc.line(margin, pageH - 12, pageW - margin, pageH - 12);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    ink(MUTED);
+    doc.text(`ATS · Performance Report for ${hostname}`, margin, pageH - 7);
+    doc.text(`Page ${i} of ${pageCount}`, pageW - margin, pageH - 7, { align: 'right' });
+  }
+
   return doc;
 }
 
 async function savePdfFile(doc: jsPDF, result: PerformanceScanResult): Promise<string> {
   const created = new Date(result.createdAt || Date.now()).toISOString().slice(0, 10);
-  let host = 'report';
-  try {
-    host = sanitizeFilePart(new URL(result.url).hostname || host);
-  } catch {
-    host = sanitizeFilePart(result.url) || host;
-  }
+  const host = sanitizeFilePart(extractHostname(result.url)) || 'report';
 
   const fileName = `performance-report-${host}-${created}.pdf`;
   const dataUri = doc.output('datauristring');

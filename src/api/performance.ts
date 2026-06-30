@@ -43,6 +43,8 @@ export async function runPerformanceScan(
     viewport?: PerformanceViewport;
     cookies?: string;
     authToken?: string;
+    siteUsername?: string;
+    sitePassword?: string;
   },
 ): Promise<PerformanceScanResult> {
   return perfRequest<PerformanceScanResult>('/performance/scan', {
@@ -54,6 +56,8 @@ export async function runPerformanceScan(
       viewport: input.viewport ?? 'desktop',
       cookies: input.cookies || undefined,
       authToken: input.authToken || undefined,
+      siteUsername: input.siteUsername || undefined,
+      sitePassword: input.sitePassword || undefined,
     }),
   });
 }

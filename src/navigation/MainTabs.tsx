@@ -25,7 +25,13 @@ export function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.cardBg,
           borderTopColor: colors.cardBorder,
+          borderTopWidth: 1,
+          height: 64,
+          paddingTop: 8,
+          paddingBottom: 10,
         },
+        tabBarItemStyle: { paddingTop: 2 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.tabInactive,
       }}

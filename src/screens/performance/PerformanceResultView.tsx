@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Share, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Card } from '../../components/ui/Card';
+import { useState } from 'react';
+import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { ScoreRing } from '../../components/performance/ScoreRing';
+import { Card } from '../../components/ui/Card';
 import { useTheme } from '../../context/ThemeContext';
-import type { PerformanceStackParamList } from '../../navigation/PerformanceStack';
-import type { PerformanceScanResult } from '../../lib/performance-types';
 import {
-  formatBytes,
-  formatMs,
-  severityBg,
-  severityColor,
+    formatBytes,
+    formatMs,
+    severityBg,
+    severityColor,
 } from '../../lib/performance-format';
+import type { PerformanceScanResult } from '../../lib/performance-types';
+import type { PerformanceStackParamList } from '../../navigation/PerformanceStack';
 type Props = {
   result: PerformanceScanResult;
   onDelete?: () => void;
@@ -54,6 +54,25 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
 
   return (
     <View style={{ gap: 16 }}>
+      {result.authWarning && (
+        <Card style={{ gap: 6, borderLeftColor: colors.accent, borderLeftWidth: 4 }}>
+          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>
+            {result.authWarning.warning}
+          </Text>
+          <Text style={{ color: colors.muted, fontSize: 12 }} numberOfLines={2}>
+            {result.authWarning.redirectedTo}
+          </Text>
+          <Text style={{ color: colors.muted, fontSize: 13 }}>
+            {result.authWarning.hint}
+          </Text>
+          {result.authWarning.loginError ? (
+            <Text style={{ color: colors.error, fontSize: 13 }}>
+              {result.authWarning.loginError}
+            </Text>
+          ) : null}
+        </Card>
+      )}
+
       <Card style={{ paddingVertical: 16, gap: 16 }}>
         <View style={styles.headerRow}>
           <View style={styles.headerScore}>

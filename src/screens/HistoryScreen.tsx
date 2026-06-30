@@ -1,15 +1,16 @@
-import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Clipboard from '@react-native-clipboard/clipboard';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { DashboardHeader } from '../components/DashboardHeader';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/ui/Card';
-import { DashboardHeader } from '../components/DashboardHeader';
 import { useAuth } from '../context/AuthContext';
-import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
+import { useUserData } from '../context/UserDataContext';
 import type { RootStackParamList } from '../navigation/types';
+import { monoFont } from '../theme/tokens';
 
 export function HistoryScreen() {
   const { token, isGuest } = useAuth();
@@ -76,7 +77,7 @@ export function HistoryScreen() {
                 {entry.results.map((res, i) => (
                   <View key={i} style={[styles.resultBox, { backgroundColor: colors.codeBg }]}>
                     <Text style={{ fontSize: 11, color: colors.tagText }}>{res.tag}</Text>
-                    <Text style={{ fontFamily: 'monospace', fontSize: 12, color: colors.mutedStrong, marginTop: 4 }} selectable>
+                    <Text style={{ fontFamily: monoFont, fontSize: 12, color: colors.mutedStrong, marginTop: 4 }} selectable>
                       {res.locator}
                     </Text>
                     <Pressable onPress={() => Clipboard.setString(res.locator)} style={{ marginTop: 6 }}>
