@@ -1,6 +1,7 @@
-import { ScrollView, View, StyleSheet, type ViewProps } from 'react-native';
+import { ScrollView, StyleSheet, View, type ViewProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { spacing } from '../theme/tokens';
 
 export function Screen({
   scroll,
@@ -24,8 +25,10 @@ export function Screen({
   );
 }
 
+const TAB_BAR_HEIGHT = 92;
+
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  fill: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 32, flexGrow: 1 },
+  fill: { flex: 1, paddingBottom: TAB_BAR_HEIGHT },
+  scroll: { padding: spacing.lg, paddingBottom: TAB_BAR_HEIGHT + spacing.lg, flexGrow: 1 },
 });

@@ -1,31 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { Screen } from '../components/Screen';
-import { Card } from '../components/ui/Card';
-import { AppInput } from '../components/ui/AppInput';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { apiFetch } from '../api/client';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { InfoRow } from '../components/profile/InfoRow';
+import { ProfileAvatar } from '../components/profile/ProfileAvatar';
 import { ProfileSection } from '../components/profile/ProfileSection';
 import { SettingRow } from '../components/profile/SettingRow';
 import { ThemeSelector } from '../components/profile/ThemeSelector';
-import { InfoRow } from '../components/profile/InfoRow';
+import { Screen } from '../components/Screen';
+import { SocialIcon } from '../components/SocialIcon';
+import { AppInput } from '../components/ui/AppInput';
+import { Card } from '../components/ui/Card';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { useAuth } from '../context/AuthContext';
-import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
-import { API_URL } from '../config/api';
-import { apiFetch } from '../api/client';
-import { ProfileAvatar } from '../components/profile/ProfileAvatar';
-import { resolveProfilePictureUrl } from '../lib/profilePicture';
 import type { ProfileData } from '../context/UserDataContext';
-
-function formatMemberSince(iso?: string): string {
-  if (!iso) return 'Not available';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Not available';
-  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-}
+import { useUserData } from '../context/UserDataContext';
+import { resolveProfilePictureUrl } from '../lib/profilePicture';
 
 export function ProfileScreen() {
   const { user, token, logout } = useAuth();
@@ -36,20 +29,25 @@ export function ProfileScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [contactVisible, setContactVisible] = useState(false);
 
   useEffect(() => {
     if (profile) {
       setFullName(profile.fullName || '');
       setPhoneNumber(profile.phoneNumber || '');
+      setLoadError('');
     }
   }, [profile]);
 
   useFocusEffect(
     useCallback(() => {
-      if (token && !profile?.createdAt) {
-        refreshProfile(true);
-      }
-    }, [token, profile?.createdAt, refreshProfile]),
+      if (!token) return;
+      setLoadError('');
+      refreshProfile(true).catch(() => {
+        setLoadError('Could not load profile. Pull down to retry.');
+      });
+    }, [token, refreshProfile]),
   );
 
   const handleSave = async () => {
@@ -94,8 +92,6 @@ export function ProfileScreen() {
 
   const pictureUrl = profile?.pictureUrl ?? user?.picture ?? null;
 
-  const accountType = profile?.isGoogleUser ? 'Google' : 'Email & password';
-  const memberSince = formatMemberSince(profile?.createdAt);
   const themeLabel =
     themePreference === 'system' ? `System (${theme})` : themePreference === 'dark' ? 'Dark' : 'Light';
 
@@ -103,10 +99,8 @@ export function ProfileScreen() {
     <Screen scroll>
       <DashboardHeader />
 
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Profile & Settings</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.muted }]}>
-        Manage your account, appearance, and preferences
-      </Text>
+     
+   
 
       {/* Profile hero */}
       <Card style={styles.heroCard}>
@@ -131,18 +125,24 @@ export function ProfileScreen() {
                   size={11}
                   color={colors.badgeText}
                 />
-                <Text style={[styles.badgeText, { color: colors.badgeText }]}>{accountType}</Text>
+                <Text style={[styles.badgeText, { color: colors.badgeText }]}>
+                  {profile?.isGoogleUser ? 'Google' : 'Email'}
+                </Text>
               </View>
-              <Text style={[styles.memberSince, { color: colors.muted }]}>Member since {memberSince}</Text>
             </View>
           </View>
         </View>
       </Card>
 
       {/* Basic profile */}
-      <ProfileSection title="Basic profile information" subtitle="Your personal details">
+      <ProfileSection >
+        {loadError ? (
+          <Text style={{ color: colors.error, fontSize: 13, marginBottom: 8 }}>{loadError}</Text>
+        ) : null}
         <Card style={{ padding: 0, overflow: 'hidden' }}>
-          {editing ? (
+          {profileLoading && !profile ? (
+            <Text style={[styles.loading, { color: colors.muted }]}>Loading profile…</Text>
+          ) : editing ? (
             <View style={styles.editBlock}>
               <AppInput label="Full name" value={fullName} onChangeText={setFullName} />
               <AppInput
@@ -165,8 +165,7 @@ export function ProfileScreen() {
               <InfoRow label="Full name" value={profile?.fullName || '—'} />
               <InfoRow label="Email" value={profile?.email || user?.email || '—'} />
               <InfoRow label="Phone" value={profile?.phoneNumber || '—'} />
-              <InfoRow label="Member since" value={memberSince} />
-              <InfoRow label="User ID" value={profile?.id ? `#${profile.id.slice(-8)}` : '—'} />
+            
               <Pressable onPress={() => setEditing(true)} style={styles.editLink}>
                 <Icon name="pencil" size={14} color={colors.accent} />
                 <Text style={{ color: colors.accent, fontWeight: '600' }}>Edit profile</Text>
@@ -186,67 +185,78 @@ export function ProfileScreen() {
         </Card>
       </ProfileSection>
 
-      {/* Settings */}
-      <ProfileSection title="Settings" subtitle="Appearance and app preferences">
-        <Card style={{ gap: 14 }}>
-          <View style={styles.settingBlock}>
-            <View style={styles.settingLabelRow}>
-              <Icon name="paint-brush" size={14} color={colors.accent} />
-              <Text style={[styles.settingLabel, { color: colors.foreground }]}>Theme</Text>
-            </View>
-            <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>
-              Current: {themeLabel}
-            </Text>
-            <ThemeSelector />
+      {/* Theme */}
+      <Card style={{ gap: 14 }}>
+        <View style={styles.settingBlock}>
+          <View style={styles.settingLabelRow}>
+            <Icon name="paint-brush" size={14} color={colors.accent} />
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Theme</Text>
           </View>
-        </Card>
-
-        <View style={{ gap: 8, marginTop: 4 }}>
-          <SettingRow
-            icon="bell-o"
-            label="Notifications"
-            value="Coming soon"
-            disabled
-            showChevron={false}
-          />
-          {/* <SettingRow
-            icon="globe"
-            label="API server"
-            value={API_URL.replace(/^https?:\/\//, '').slice(0, 32)}
-            disabled
-            showChevron={false}
-          /> */}
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>
+            Current: {themeLabel}
+          </Text>
+          <ThemeSelector />
         </View>
-      </ProfileSection>
+      </Card>
 
       {/* Account management */}
-      <ProfileSection title="Account management" subtitle="Security and session">
-        <View style={{ gap: 8 }}>
-          <SettingRow icon="id-card-o" label="Sign-in method" value={accountType} showChevron={false} />
+      <View style={{ gap: 8 }}>
+        {!profile?.isGoogleUser ? (
           <SettingRow
-            icon="calendar-o"
-            label="Member since"
-            value={formatMemberSince(profile?.createdAt)}
-            showChevron={false}
+            icon="lock"
+            label="Change password"
+            value="Unavailable"
+            onPress={() =>
+              Alert.alert(
+                'Change password',
+                'Unavailable',
+              )
+            }
           />
-          {!profile?.isGoogleUser ? (
-            <SettingRow
-              icon="lock"
-              label="Change password"
-              value="Unavailable"
-              onPress={() =>
-                Alert.alert(
-                  'Change password',
-                  'Unavailable',
-                )
-              }
-            />
-          ) : null}
-          <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
-        </View>
-      </ProfileSection>
+        ) : null}
+       
+      </View>
 
-      <Text style={[styles.footer, { color: colors.muted }]}>TWT Locator · v1.0.0</Text>
+      <View style={{ gap: 8 }}>
+        <SettingRow
+          icon="envelope"
+          label="Contact"
+          value="Get in touch"
+          onPress={() => setContactVisible(true)}
+          showChevron
+        />
+      </View>
+ <View>
+   <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
+ </View>
+      <Text style={[styles.footer, { color: colors.muted }]}>ATS Locator · v1.0.0</Text>
+
+      <Modal
+        visible={contactVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContactVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Contact</Text>
+              <Pressable onPress={() => setContactVisible(false)}>
+                <Icon name="close" size={20} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <View style={styles.socialRow}>
+              <SocialIcon name="email" url="mailto:tewodrosberhanu19@gmail.com" size={28} />
+              <SocialIcon name="linkedin" url="https://www.linkedin.com/in/tewodros-berhanu/" size={28} />
+              <SocialIcon name="github" url="https://github.com/tediyo" size={28} />
+              <SocialIcon name="portfolio" url="https://tewodrosberhanu.com/" size={28} />
+              <SocialIcon name="whatsapp" url="https://wa.me/251947087598" size={28} />
+              <SocialIcon name="telegram" url="https://t.me/thedron16" size={28} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -270,9 +280,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   badgeText: { fontSize: 11, fontWeight: '600' },
-  memberSince: { fontSize: 12 },
   infoBlock: { paddingHorizontal: 16, paddingBottom: 8 },
   editBlock: { padding: 16, gap: 12 },
+  loading: { padding: 20, textAlign: 'center', fontSize: 14 },
   editLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -286,4 +296,30 @@ const styles = StyleSheet.create({
   settingLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   settingLabel: { fontSize: 15, fontWeight: '600' },
   footer: { textAlign: 'center', fontSize: 11, marginTop: 28, marginBottom: 32 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  socialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+  },
 });

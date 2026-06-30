@@ -1,11 +1,17 @@
-import { View, StyleSheet, type ViewProps } from 'react-native';
+import { StyleSheet, View, type ViewProps } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { radius, shadow, spacing } from '../../theme/tokens';
 
 export function Card({ style, children, ...props }: ViewProps) {
   const { colors } = useTheme();
   return (
     <View
-      style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }, style]}
+      style={[
+        styles.card,
+        shadow('sm', colors.shadow),
+        { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+        style,
+      ]}
       {...props}
     >
       {children}
@@ -16,12 +22,7 @@ export function Card({ style, children, ...props }: ViewProps) {
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
   },
 });

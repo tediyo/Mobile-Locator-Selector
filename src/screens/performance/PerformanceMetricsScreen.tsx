@@ -1,9 +1,9 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '../../components/Screen';
 import { PerformanceMetricsTable } from '../../components/performance/PerformanceMetricsTable';
 import { useTheme } from '../../context/ThemeContext';
-import { getPerformanceMetricRows } from '../../lib/performance-metrics-rows';
+import { buildPerformanceMetricRows } from '../../lib/performance-metrics-rows';
 import type { PerformanceStackParamList } from '../../navigation/PerformanceStack';
 
 type Props = NativeStackScreenProps<PerformanceStackParamList, 'PerformanceMetrics'>;
@@ -11,7 +11,7 @@ type Props = NativeStackScreenProps<PerformanceStackParamList, 'PerformanceMetri
 export function PerformanceMetricsScreen({ navigation, route }: Props) {
   const { result } = route.params;
   const { colors } = useTheme();
-  const rows = getPerformanceMetricRows(result);
+  const rows = buildPerformanceMetricRows(result);
 
   return (
     <Screen scroll>

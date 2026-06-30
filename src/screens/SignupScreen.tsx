@@ -1,17 +1,17 @@
-import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { openGoogleSignIn } from '../auth/openGoogleSignIn';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Screen } from '../components/Screen';
-import { Card } from '../components/ui/Card';
-import { AppInput } from '../components/ui/AppInput';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Icon from 'react-native-vector-icons/FontAwesome';
+import { apiFetch } from '../api/client';
+import { openGoogleSignIn } from '../auth/openGoogleSignIn';
 import { Logo } from '../components/Logo';
+import { Screen } from '../components/Screen';
+import { AppInput } from '../components/ui/AppInput';
+import { Card } from '../components/ui/Card';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiFetch } from '../api/client';
-import { API_URL } from '../config/api';
 import type { RootStackParamList } from '../navigation/types';
 
 export function SignupScreen() {
@@ -77,9 +77,13 @@ export function SignupScreen() {
                     setError(err instanceof Error ? err.message : 'Google sign-in failed');
                   }
                 }}
-                style={[styles.outlineBtn, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }]}
+                style={({ pressed }) => [
+                  styles.outlineBtn,
+                  { borderColor: colors.inputBorder, backgroundColor: colors.inputBg, opacity: pressed ? 0.85 : 1 },
+                ]}
               >
-                <Text style={{ color: colors.foreground }}>Sign up with Google</Text>
+                <Icon name="google" size={16} color={colors.accent} />
+                <Text style={{ color: colors.foreground, fontWeight: '600' }}>Sign up with Google</Text>
               </Pressable>
             </>
           )}
@@ -105,6 +109,16 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', gap: 8 },
   title: { fontSize: 24, fontWeight: '700' },
   banner: { fontSize: 14, textAlign: 'center' },
-  outlineBtn: { padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  outlineBtn: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
   footer: { textAlign: 'center', fontSize: 14 },
 });

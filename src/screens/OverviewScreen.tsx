@@ -1,21 +1,23 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityBarChart, LocatorPieChart } from '../components/AnalyticsCharts';
+import { DashboardHeader } from '../components/DashboardHeader';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/ui/Card';
-import { DashboardHeader } from '../components/DashboardHeader';
-import { ActivityBarChart, LocatorPieChart } from '../components/AnalyticsCharts';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { useAuth } from '../context/AuthContext';
-import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
+import { useUserData } from '../context/UserDataContext';
 import {
-  type DateFilter,
-  type DatePreset,
-  defaultDateFilter,
-  runAnalytics,
-  activityChartTitle,
-  toYMD,
+    activityChartTitle,
+    type DateFilter,
+    type DatePreset,
+    defaultDateFilter,
+    runAnalytics,
+    toYMD,
 } from '../lib/dashboard-analytics';
+import { monoFont } from '../theme/tokens';
 
 export function OverviewScreen() {
   const { token, isGuest } = useAuth();
@@ -70,25 +72,15 @@ export function OverviewScreen() {
 
       <Card style={{ gap: 12, marginBottom: 16 }}>
         <Text style={[styles.sectionLabel, { color: colors.muted }]}>REPORT PERIOD</Text>
-        <View style={[styles.presetRow, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          {(['all', 'single', 'range'] as const).map((p) => (
-            <Pressable
-              key={p}
-              onPress={() => setPreset(p)}
-              style={[styles.presetBtn, draftFilter.preset === p && { backgroundColor: colors.accent }]}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: '600',
-                  color: draftFilter.preset === p ? colors.primaryText : colors.muted,
-                }}
-              >
-                {p === 'all' ? 'All time' : p === 'single' ? 'One day' : 'Range'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <SegmentedControl
+          value={draftFilter.preset}
+          onChange={(p) => setPreset(p)}
+          options={[
+            { value: 'all', label: 'All time' },
+            { value: 'single', label: 'One day' },
+            { value: 'range', label: 'Range' },
+          ]}
+        />
 
         {draftFilter.preset === 'single' && (
           <Pressable onPress={() => setShowDatePicker('single')} style={[styles.dateBtn, { borderColor: colors.inputBorder }]}>
@@ -113,7 +105,7 @@ export function OverviewScreen() {
         )}
 
         {token && indexedHistory.length > 0 && (
-          <Text style={{ fontSize: 10, color: colors.muted, fontFamily: 'monospace' }}>
+          <Text style={{ fontSize: 10, color: colors.muted, fontFamily: monoFont }}>
             {perf.recordCount} in report · {perf.totalMs}ms · {perf.activityPoints} chart pts
             {filterPending ? ' · draft pending' : ''}
           </Text>
@@ -146,11 +138,11 @@ export function OverviewScreen() {
         </Card>
         <Card style={styles.kpi}>
           <Text style={[styles.kpiLabel, { color: colors.muted }]}>ELEMENTS</Text>
-          <Text style={[styles.kpiVal, { color: '#3b82f6' }]}>{stats?.totalElements ?? 0}</Text>
+          <Text style={[styles.kpiVal, { color: colors.info }]}>{stats?.totalElements ?? 0}</Text>
         </Card>
         <Card style={[styles.kpi, { flex: 1.2 }]}>
           <Text style={[styles.kpiLabel, { color: colors.muted }]}>TOP TYPE</Text>
-          <Text style={[styles.kpiVal, { color: '#10b981', fontSize: 18, textTransform: 'capitalize' }]}>
+          <Text style={[styles.kpiVal, { color: colors.secondary, fontSize: 18, textTransform: 'capitalize' }]}>
             {stats?.topType ?? 'None'}
           </Text>
         </Card>
@@ -183,8 +175,6 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
   title: { fontSize: 18, fontWeight: '700' },
   sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 1 },
-  presetRow: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, padding: 2 },
-  presetBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
   dateBtn: { borderWidth: 1, borderRadius: 8, padding: 12 },
   applyBtn: { padding: 12, borderRadius: 8, alignItems: 'center' },
   kpiRow: { flexDirection: 'row', gap: 8 },

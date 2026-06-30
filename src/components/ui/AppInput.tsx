@@ -1,13 +1,18 @@
-import { TextInput, View, Text, StyleSheet, type TextInputProps } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { fontSize, fontWeight, radius, spacing } from '../../theme/tokens';
 
 export function AppInput({
   label,
   optional,
   containerStyle,
+  onFocus,
+  onBlur,
   ...props
 }: TextInputProps & { label: string; optional?: boolean; containerStyle?: object }) {
   const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <View style={[styles.wrap, containerStyle]}>
       <Text style={[styles.label, { color: colors.mutedStrong }]}>
@@ -20,10 +25,18 @@ export function AppInput({
           styles.input,
           {
             backgroundColor: colors.inputBg,
-            borderColor: colors.inputBorder,
+            borderColor: focused ? colors.accent : colors.inputBorder,
             color: colors.foreground,
           },
         ]}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
         {...props}
       />
     </View>
@@ -31,13 +44,14 @@ export function AppInput({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6 },
-  label: { fontSize: 14, fontWeight: '500' },
+  wrap: { gap: spacing.xs + 2 },
+  label: { fontSize: fontSize.md, fontWeight: fontWeight.medium },
   input: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md - 1,
+    fontSize: fontSize.md,
+    minHeight: 46,
   },
 });
