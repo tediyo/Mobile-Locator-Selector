@@ -1,7 +1,7 @@
 import { Linking } from 'react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
-import type { User } from '../context/AuthContext';
 import { API_URL } from '../config/api';
+import type { User } from '../context/AuthContext';
 import { getGoogleAuthUrl, OAUTH_REDIRECT_URI, parseOAuthCallback } from './oauth';
 
 export type GoogleSignInResult = { token: string; user: User } | null;
@@ -9,6 +9,7 @@ export type GoogleSignInResult = { token: string; user: User } | null;
 /**
  * Opens Google OAuth. When the backend redirects to `twt-locator://auth/callback`,
  * returns token + user and closes the browser tab automatically.
+ * Note: the redirect URI remains `twt-locator://` for OAuth compatibility.
  */
 export async function openGoogleSignIn(): Promise<GoogleSignInResult> {
   const url = getGoogleAuthUrl(API_URL);

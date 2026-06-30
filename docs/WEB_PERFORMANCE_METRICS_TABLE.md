@@ -1,6 +1,6 @@
 # Web app — Performance metrics table (parity with mobile)
 
-Guide to implement the **Performance metrics** table on the **web dashboard**, matching the **TWT Locator mobile** app.
+Guide to implement the **Performance metrics** table on the **web dashboard**, matching the **ATS Locator mobile** app.
 
 Use this when you already have a performance scan result on screen (`PerformanceScanResult` from `POST /performance/scan` or history) and want a dedicated **Metric | Value | Notes** table view.
 

@@ -1,6 +1,6 @@
 # Mobile app — Performance API integration
 
-Integration guide for the **TWT Locator** mobile app using the shared NestJS backend.
+Integration guide for the **ATS Locator** mobile app using the shared NestJS backend.
 
 ## Overview
 

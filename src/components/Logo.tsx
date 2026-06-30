@@ -1,18 +1,21 @@
-import { Text, StyleSheet } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
-/** Text logo matching web TWT branding when image assets are unavailable */
 export function Logo({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
-  const { colors } = useTheme();
+  const { theme } = useTheme();
+  const source = theme === 'dark'
+    ? require('../../assets/Logo/black.png')
+    : require('../../assets/Logo/white.png');
+  const dimensions = size === 'lg' ? { width: 120, height: 40 } : { width: 72, height: 24 };
   return (
-    <Text style={[styles.logo, size === 'lg' ? styles.lg : styles.sm, { color: colors.accent }]}>
-      TWT
-    </Text>
+    <Image
+      source={source}
+      style={[styles.logo, dimensions]}
+      resizeMode="contain"
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  logo: { fontWeight: '800', letterSpacing: 2 },
-  lg: { fontSize: 36 },
-  sm: { fontSize: 24 },
+  logo: { alignSelf: 'flex-start' },
 });

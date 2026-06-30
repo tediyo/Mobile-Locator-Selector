@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { apiFetch } from '../api/client';
 import { DashboardHeader } from '../components/DashboardHeader';
@@ -10,6 +10,7 @@ import { ProfileSection } from '../components/profile/ProfileSection';
 import { SettingRow } from '../components/profile/SettingRow';
 import { ThemeSelector } from '../components/profile/ThemeSelector';
 import { Screen } from '../components/Screen';
+import { SocialIcon } from '../components/SocialIcon';
 import { AppInput } from '../components/ui/AppInput';
 import { Card } from '../components/ui/Card';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -29,6 +30,7 @@ export function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [contactVisible, setContactVisible] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -133,7 +135,7 @@ export function ProfileScreen() {
       </Card>
 
       {/* Basic profile */}
-      <ProfileSection title="Basic profile information" subtitle="Your personal details">
+      <ProfileSection >
         {loadError ? (
           <Text style={{ color: colors.error, fontSize: 13, marginBottom: 8 }}>{loadError}</Text>
         ) : null}
@@ -212,10 +214,49 @@ export function ProfileScreen() {
             }
           />
         ) : null}
-        <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
+       
       </View>
 
-      <Text style={[styles.footer, { color: colors.muted }]}>TWT Locator · v1.0.0</Text>
+      <View style={{ gap: 8 }}>
+        <SettingRow
+          icon="envelope"
+          label="Contact"
+          value="Get in touch"
+          onPress={() => setContactVisible(true)}
+          showChevron
+        />
+      </View>
+ <View>
+   <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
+ </View>
+      <Text style={[styles.footer, { color: colors.muted }]}>ATS Locator · v1.0.0</Text>
+
+      <Modal
+        visible={contactVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContactVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Contact</Text>
+              <Pressable onPress={() => setContactVisible(false)}>
+                <Icon name="close" size={20} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <View style={styles.socialRow}>
+              <SocialIcon name="email" url="mailto:tewodrosberhanu19@gmail.com" size={28} />
+              <SocialIcon name="linkedin" url="https://www.linkedin.com/in/tewodros-berhanu/" size={28} />
+              <SocialIcon name="github" url="https://github.com/tediyo" size={28} />
+              <SocialIcon name="portfolio" url="https://tewodrosberhanu.com/" size={28} />
+              <SocialIcon name="whatsapp" url="https://wa.me/251947087598" size={28} />
+              <SocialIcon name="telegram" url="https://t.me/thedron16" size={28} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -255,4 +296,30 @@ const styles = StyleSheet.create({
   settingLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   settingLabel: { fontSize: 15, fontWeight: '600' },
   footer: { textAlign: 'center', fontSize: 11, marginTop: 28, marginBottom: 32 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  socialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+  },
 });

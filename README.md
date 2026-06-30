@@ -1,6 +1,6 @@
-# TWT Locator — Mobile App
+# ATS Locator — Mobile App
 
-React Native (bare) client for the TWT QA Locator Tool. No Expo — runs as a standard native Android app via USB or Android Studio.
+React Native (bare) client for the ATS QA Locator Tool. No Expo — runs as a standard native Android app via USB or Android Studio.
 
 ## Prerequisites
 
