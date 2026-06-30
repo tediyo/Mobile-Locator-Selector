@@ -28,20 +28,24 @@ export function ProfileScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (profile) {
       setFullName(profile.fullName || '');
       setPhoneNumber(profile.phoneNumber || '');
+      setLoadError('');
     }
   }, [profile]);
 
   useFocusEffect(
     useCallback(() => {
-      if (token && !profile?.createdAt) {
-        refreshProfile(true);
-      }
-    }, [token, profile?.createdAt, refreshProfile]),
+      if (!token) return;
+      setLoadError('');
+      refreshProfile(true).catch(() => {
+        setLoadError('Could not load profile. Pull down to retry.');
+      });
+    }, [token, refreshProfile]),
   );
 
   const handleSave = async () => {
@@ -94,9 +98,7 @@ export function ProfileScreen() {
       <DashboardHeader />
 
      
-      <Text style={[styles.pageSubtitle, { color: colors.muted }]}>
-        Manage your account, appearance, and preferences
-      </Text>
+   
 
       {/* Profile hero */}
       <Card style={styles.heroCard}>
@@ -132,8 +134,13 @@ export function ProfileScreen() {
 
       {/* Basic profile */}
       <ProfileSection title="Basic profile information" subtitle="Your personal details">
+        {loadError ? (
+          <Text style={{ color: colors.error, fontSize: 13, marginBottom: 8 }}>{loadError}</Text>
+        ) : null}
         <Card style={{ padding: 0, overflow: 'hidden' }}>
-          {editing ? (
+          {profileLoading && !profile ? (
+            <Text style={[styles.loading, { color: colors.muted }]}>Loading profile…</Text>
+          ) : editing ? (
             <View style={styles.editBlock}>
               <AppInput label="Full name" value={fullName} onChangeText={setFullName} />
               <AppInput
@@ -176,41 +183,37 @@ export function ProfileScreen() {
         </Card>
       </ProfileSection>
 
-      {/* Settings */}
-      <ProfileSection title="Settings" subtitle="Appearance and app preferences">
-        <Card style={{ gap: 14 }}>
-          <View style={styles.settingBlock}>
-            <View style={styles.settingLabelRow}>
-              <Icon name="paint-brush" size={14} color={colors.accent} />
-              <Text style={[styles.settingLabel, { color: colors.foreground }]}>Theme</Text>
-            </View>
-            <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>
-              Current: {themeLabel}
-            </Text>
-            <ThemeSelector />
+      {/* Theme */}
+      <Card style={{ gap: 14 }}>
+        <View style={styles.settingBlock}>
+          <View style={styles.settingLabelRow}>
+            <Icon name="paint-brush" size={14} color={colors.accent} />
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Theme</Text>
           </View>
-        </Card>
-      </ProfileSection>
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>
+            Current: {themeLabel}
+          </Text>
+          <ThemeSelector />
+        </View>
+      </Card>
 
       {/* Account management */}
-      <ProfileSection title="Account management" subtitle="Security and session">
-        <View style={{ gap: 8 }}>
-          {!profile?.isGoogleUser ? (
-            <SettingRow
-              icon="lock"
-              label="Change password"
-              value="Unavailable"
-              onPress={() =>
-                Alert.alert(
-                  'Change password',
-                  'Unavailable',
-                )
-              }
-            />
-          ) : null}
-          <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
-        </View>
-      </ProfileSection>
+      <View style={{ gap: 8 }}>
+        {!profile?.isGoogleUser ? (
+          <SettingRow
+            icon="lock"
+            label="Change password"
+            value="Unavailable"
+            onPress={() =>
+              Alert.alert(
+                'Change password',
+                'Unavailable',
+              )
+            }
+          />
+        ) : null}
+        <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
+      </View>
 
       <Text style={[styles.footer, { color: colors.muted }]}>TWT Locator · v1.0.0</Text>
     </Screen>
@@ -236,9 +239,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   badgeText: { fontSize: 11, fontWeight: '600' },
-  memberSince: { fontSize: 12 },
   infoBlock: { paddingHorizontal: 16, paddingBottom: 8 },
   editBlock: { padding: 16, gap: 12 },
+  loading: { padding: 20, textAlign: 'center', fontSize: 14 },
   editLink: {
     flexDirection: 'row',
     alignItems: 'center',
