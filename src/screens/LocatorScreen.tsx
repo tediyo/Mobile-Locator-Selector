@@ -1,6 +1,7 @@
 import Clipboard from '@react-native-clipboard/clipboard';
 import { Picker } from '@react-native-picker/picker';
-import { useState } from 'react';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiFetch } from '../api/client';
 import { DashboardHeader } from '../components/DashboardHeader';
