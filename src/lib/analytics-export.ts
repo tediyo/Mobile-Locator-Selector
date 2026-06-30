@@ -1,13 +1,14 @@
+import type { jsPDF } from 'jspdf';
 import { Platform } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
-import type { jsPDF } from 'jspdf';
 import type {
-  ActivityPoint,
-  DateFilter,
-  IndexedHistoryEntry,
-  PiePoint,
+    ActivityPoint,
+    DateFilter,
+    IndexedHistoryEntry,
+    PiePoint,
 } from './dashboard-analytics';
 import { activityChartTitle } from './dashboard-analytics';
+import type { PerformanceScanResult } from './performance-types';
 
 export type ExportFormat = 'csv' | 'json' | 'pdf';
 
@@ -17,6 +18,8 @@ export interface AnalyticsExportData {
   stats: { totalSearches: number; totalElements: number; topType: string } | null;
   activityData: ActivityPoint[];
   pieData: PiePoint[];
+  perfHistory?: PerformanceScanResult[];
+  perfStats?: { totalScans: number; avgScore: number; criticalCount: number; warningCount: number } | null;
 }
 
 type AutoTableFn = (doc: jsPDF, options: Record<string, unknown>) => void;
@@ -36,42 +39,102 @@ function csvEscape(value: string | number): string {
 
 function buildCsv(data: AnalyticsExportData): string {
   const lines: string[] = [];
-  lines.push('ATS Analytics Report');
+  const isPerf = data.perfHistory && data.perfHistory.length > 0;
+  
+  lines.push(isPerf ? 'ATS Performance Analytics Report' : 'ATS Analytics Report');
   lines.push(`Period,${csvEscape(activityChartTitle(data.filter))}`);
   lines.push(`Generated,${csvEscape(new Date().toLocaleString())}`);
   lines.push('');
 
-  lines.push('Summary');
-  lines.push(`Total searches,${data.stats?.totalSearches ?? 0}`);
-  lines.push(`Total elements,${data.stats?.totalElements ?? 0}`);
-  lines.push(`Top locator type,${csvEscape(data.stats?.topType ?? 'None')}`);
-  lines.push('');
+  if (isPerf) {
+    lines.push('Summary');
+    lines.push(`Total scans,${data.perfStats?.totalScans ?? 0}`);
+    lines.push(`Average score,${data.perfStats?.avgScore ?? 0}`);
+    lines.push(`Critical findings,${data.perfStats?.criticalCount ?? 0}`);
+    lines.push(`Warning findings,${data.perfStats?.warningCount ?? 0}`);
+    lines.push('');
 
-  lines.push('Locator type breakdown');
-  lines.push('Type,Count');
-  for (const slice of data.pieData) {
-    lines.push(`${csvEscape(slice.name)},${slice.value}`);
-  }
-  lines.push('');
+    lines.push('Performance scans');
+    lines.push('Date,URL,Score,Duration,Critical,Warning');
+    for (const scan of data.perfHistory) {
+      const critical = scan.findings.filter((f) => f.severity === 'critical').length;
+      const warning = scan.findings.filter((f) => f.severity === 'warning').length;
+      lines.push(
+        [
+          csvEscape(new Date(scan.createdAt).toLocaleString()),
+          csvEscape(scan.url),
+          scan.score,
+          `${scan.durationMs}ms`,
+          critical,
+          warning,
+        ].join(','),
+      );
+    }
+  } else {
+    lines.push('Summary');
+    lines.push(`Total searches,${data.stats?.totalSearches ?? 0}`);
+    lines.push(`Total elements,${data.stats?.totalElements ?? 0}`);
+    lines.push(`Top locator type,${csvEscape(data.stats?.topType ?? 'None')}`);
+    lines.push('');
 
-  lines.push('History entries');
-  lines.push('Date,URL,Keyword,Type,Results');
-  for (const entry of data.entries) {
-    lines.push(
-      [
-        csvEscape(new Date(entry.createdAt).toLocaleString()),
-        csvEscape(entry.url),
-        csvEscape(entry.keyword),
-        csvEscape(entry.locatorType),
-        entry.results.length,
-      ].join(','),
-    );
+    lines.push('Locator type breakdown');
+    lines.push('Type,Count');
+    for (const slice of data.pieData) {
+      lines.push(`${csvEscape(slice.name)},${slice.value}`);
+    }
+    lines.push('');
+
+    lines.push('History entries');
+    lines.push('Date,URL,Keyword,Type,Results');
+    for (const entry of data.entries) {
+      lines.push(
+        [
+          csvEscape(new Date(entry.createdAt).toLocaleString()),
+          csvEscape(entry.url),
+          csvEscape(entry.keyword),
+          csvEscape(entry.locatorType),
+          entry.results.length,
+        ].join(','),
+      );
+    }
   }
 
   return lines.join('\n');
 }
 
 function buildJson(data: AnalyticsExportData): string {
+  const isPerf = data.perfHistory && data.perfHistory.length > 0;
+  
+  if (isPerf) {
+    return JSON.stringify(
+      {
+        report: 'ATS Performance Analytics',
+        generatedAt: new Date().toISOString(),
+        period: activityChartTitle(data.filter),
+        filter: data.filter,
+        summary: {
+          totalScans: data.perfStats?.totalScans ?? 0,
+          avgScore: data.perfStats?.avgScore ?? 0,
+          criticalCount: data.perfStats?.criticalCount ?? 0,
+          warningCount: data.perfStats?.warningCount ?? 0,
+        },
+        activity: data.activityData,
+        scans: data.perfHistory.map((s) => ({
+          id: s._id,
+          date: s.createdAt,
+          url: s.url,
+          viewport: s.viewport,
+          score: s.score,
+          durationMs: s.durationMs,
+          criticalCount: s.findings.filter((f) => f.severity === 'critical').length,
+          warningCount: s.findings.filter((f) => f.severity === 'warning').length,
+        })),
+      },
+      null,
+      2,
+    );
+  }
+  
   return JSON.stringify(
     {
       report: 'ATS Analytics',
@@ -104,6 +167,7 @@ function buildPdf(data: AnalyticsExportData, JsPDF: typeof jsPDF, autoTable: Aut
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 14;
   let y = margin + 4;
+  const isPerf = data.perfHistory && data.perfHistory.length > 0;
 
   const INK: [number, number, number] = [15, 23, 42];
   const MUTED: [number, number, number] = [100, 116, 139];
@@ -112,7 +176,7 @@ function buildPdf(data: AnalyticsExportData, JsPDF: typeof jsPDF, autoTable: Aut
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(...INK);
-  doc.text('ATS Analytics Report', margin, y);
+  doc.text(isPerf ? 'ATS Performance Analytics Report' : 'ATS Analytics Report', margin, y);
   y += 7;
 
   doc.setFont('helvetica', 'normal');
@@ -124,30 +188,54 @@ function buildPdf(data: AnalyticsExportData, JsPDF: typeof jsPDF, autoTable: Aut
   y += 8;
 
   // KPI summary
-  const kpis: [string, string][] = [
-    ['Total searches', String(data.stats?.totalSearches ?? 0)],
-    ['Total elements', String(data.stats?.totalElements ?? 0)],
-    ['Top type', data.stats?.topType ?? 'None'],
-  ];
-  const cardW = (pageW - margin * 2 - 8) / 3;
-  kpis.forEach(([label, value], i) => {
-    const x = margin + i * (cardW + 4);
-    doc.setDrawColor(226, 232, 240);
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x, y, cardW, 20, 2, 2, 'FD');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...MUTED);
-    doc.text(label.toUpperCase(), x + 4, y + 7);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(...ACCENT);
-    doc.text(value, x + 4, y + 16);
-  });
-  y += 28;
+  if (isPerf) {
+    const kpis: [string, string][] = [
+      ['Total scans', String(data.perfStats?.totalScans ?? 0)],
+      ['Avg score', String(data.perfStats?.avgScore ?? 0)],
+      ['Critical', String(data.perfStats?.criticalCount ?? 0)],
+    ];
+    const cardW = (pageW - margin * 2 - 8) / 3;
+    kpis.forEach(([label, value], i) => {
+      const x = margin + i * (cardW + 4);
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(x, y, cardW, 20, 2, 2, 'FD');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...MUTED);
+      doc.text(label.toUpperCase(), x + 4, y + 7);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(i === 2 ? [239, 68, 68] : ACCENT);
+      doc.text(value, x + 4, y + 16);
+    });
+    y += 28;
+  } else {
+    const kpis: [string, string][] = [
+      ['Total searches', String(data.stats?.totalSearches ?? 0)],
+      ['Total elements', String(data.stats?.totalElements ?? 0)],
+      ['Top type', data.stats?.topType ?? 'None'],
+    ];
+    const cardW = (pageW - margin * 2 - 8) / 3;
+    kpis.forEach(([label, value], i) => {
+      const x = margin + i * (cardW + 4);
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(x, y, cardW, 20, 2, 2, 'FD');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...MUTED);
+      doc.text(label.toUpperCase(), x + 4, y + 7);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(...ACCENT);
+      doc.text(value, x + 4, y + 16);
+    });
+    y += 28;
+  }
 
-  // Locator type breakdown
-  if (data.pieData.length > 0) {
+  // Locator type breakdown (only for locator)
+  if (!isPerf && data.pieData.length > 0) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(...INK);
@@ -171,11 +259,11 @@ function buildPdf(data: AnalyticsExportData, JsPDF: typeof jsPDF, autoTable: Aut
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(...INK);
-    doc.text('Activity', margin, y);
+    doc.text(isPerf ? 'Scan Activity' : 'Activity', margin, y);
     y += 4;
     autoTable(doc, {
       startY: y,
-      head: [['Date', 'Searches']],
+      head: [['Date', isPerf ? 'Scans' : 'Searches']],
       body: data.activityData.map((a) => [a.date, String(a.searches)]),
       theme: 'plain',
       headStyles: { fillColor: INK, textColor: 255, fontStyle: 'bold', fontSize: 8 },
@@ -186,8 +274,43 @@ function buildPdf(data: AnalyticsExportData, JsPDF: typeof jsPDF, autoTable: Aut
     y = (doc.lastAutoTable?.finalY ?? y) + 8;
   }
 
-  // History entries
-  if (data.entries.length > 0) {
+  // History entries or Performance scans
+  if (isPerf && data.perfHistory.length > 0) {
+    if (y > doc.internal.pageSize.getHeight() - 40) {
+      doc.addPage();
+      y = margin + 4;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...INK);
+    doc.text('Performance scans', margin, y);
+    y += 4;
+    autoTable(doc, {
+      startY: y,
+      head: [['Date', 'URL', 'Score', 'Duration', 'Critical', 'Warning']],
+      body: data.perfHistory.map((s) => [
+        new Date(s.createdAt).toLocaleDateString(),
+        s.url.replace(/^https?:\/\//, ''),
+        String(s.score),
+        `${s.durationMs}ms`,
+        String(s.findings.filter((f) => f.severity === 'critical').length),
+        String(s.findings.filter((f) => f.severity === 'warning').length),
+      ]),
+      theme: 'plain',
+      headStyles: { fillColor: INK, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+      bodyStyles: { fontSize: 7, cellPadding: 1.8, overflow: 'linebreak', textColor: [51, 65, 85] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 24 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 16 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 18 },
+      },
+      margin: { left: margin, right: margin },
+    });
+  } else if (!isPerf && data.entries.length > 0) {
     if (y > doc.internal.pageSize.getHeight() - 40) {
       doc.addPage();
       y = margin + 4;
