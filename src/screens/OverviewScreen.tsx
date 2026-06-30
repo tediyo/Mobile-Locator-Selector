@@ -42,6 +42,34 @@ export function OverviewScreen() {
     [indexedHistory, appliedFilter],
   );
 
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      if (exporting) return;
+      if (filtered.length === 0) {
+        Alert.alert('Nothing to export', 'There is no data for the selected period.');
+        return;
+      }
+      setExporting(format);
+      try {
+        const path = await exportAnalytics(format, {
+          filter: appliedFilter,
+          entries: filtered,
+          stats,
+          activityData: charts.activityData,
+          pieData: charts.pieData,
+        });
+        Alert.alert('Export saved', `${format.toUpperCase()} saved:\n${path}`);
+      } catch (err) {
+        Alert.alert('Export failed', err instanceof Error ? err.message : 'Could not export analytics.');
+      } finally {
+        setExporting(null);
+      }
+    },
+    [exporting, filtered, appliedFilter, stats, charts],
+  );
+
   const setPreset = (preset: DatePreset) => {
     const next = { ...draftFilter, preset };
     setDraftFilter(next);
@@ -159,13 +187,39 @@ export function OverviewScreen() {
         )}
       </Card>
 
-      <Card style={{ marginTop: 16, gap: 12, marginBottom: 24 }}>
+      <Card style={{ marginTop: 16, gap: 12 }}>
         <Text style={[styles.chartTitle, { color: colors.foreground }]}>Locator Types</Text>
         {showInitialLoader ? (
           <ActivityIndicator color={colors.accent} />
         ) : (
           <LocatorPieChart data={charts.pieData} />
         )}
+      </Card>
+
+      <Card style={{ marginTop: 16, gap: 12, marginBottom: 24 }}>
+        <Text style={[styles.chartTitle, { color: colors.foreground }]}>Export report</Text>
+        <Text style={{ color: colors.muted, fontSize: 12 }}>
+          Download the analytics for the selected period ({perf.recordCount} {perf.recordCount === 1 ? 'record' : 'records'}).
+        </Text>
+        <View style={styles.exportRow}>
+          {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt) => (
+            <Pressable
+              key={fmt}
+              onPress={() => handleExport(fmt)}
+              disabled={!!exporting || filtered.length === 0}
+              style={[
+                styles.exportBtn,
+                { borderColor: colors.accent, opacity: !!exporting || filtered.length === 0 ? 0.5 : 1 },
+              ]}
+            >
+              {exporting === fmt ? (
+                <ActivityIndicator color={colors.accent} size="small" />
+              ) : (
+                <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>{fmt.toUpperCase()}</Text>
+              )}
+            </Pressable>
+          ))}
+        </View>
       </Card>
     </Screen>
   );
@@ -182,4 +236,14 @@ const styles = StyleSheet.create({
   kpiLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4 },
   kpiVal: { fontSize: 24, fontWeight: '700' },
   chartTitle: { fontSize: 16, fontWeight: '700' },
+  exportRow: { flexDirection: 'row', gap: 8 },
+  exportBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
 });

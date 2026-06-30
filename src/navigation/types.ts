@@ -6,7 +6,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Overview: undefined;
-  Locator: undefined;
+  Locator: { url?: string; keyword?: string; locatorType?: string; autoRun?: boolean } | undefined;
   Performance: undefined;
   History: undefined;
   Profile: undefined;
