@@ -1,11 +1,36 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Circle, G } from 'react-native-svg';
-import type { ActivityPoint, PiePoint } from '../lib/dashboard-analytics';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Defs, G, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
+import type { ActivityPoint, PiePoint } from '../lib/dashboard-analytics';
 
 const chartWidth = Dimensions.get('window').width - 64;
-const BAR_HEIGHT = 200;
+const CHART_HEIGHT = 200;
+const PADDING = 20;
+
+// Catmull-Rom spline interpolation for smooth curves
+function createSmoothPath(points: { x: number; y: number }[]): string {
+  if (points.length < 2) return '';
+  
+  const tension = 0.4;
+  let path = `M ${points[0].x} ${points[0].y}`;
+  
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    
+    const cp1x = p1.x + (p2.x - p0.x) * tension / 3;
+    const cp1y = p1.y + (p2.y - p0.y) * tension / 3;
+    const cp2x = p2.x - (p3.x - p1.x) * tension / 3;
+    const cp2y = p2.y - (p3.y - p1.y) * tension / 3;
+    
+    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+  
+  return path;
+}
 
 export const ActivityBarChart = React.memo(function ActivityBarChart({ data }: { data: ActivityPoint[] }) {
   const { colors } = useTheme();
@@ -15,33 +40,72 @@ export const ActivityBarChart = React.memo(function ActivityBarChart({ data }: {
   }
 
   const maxValue = Math.max(...data.map((d) => d.searches), 1);
-  const barSlot = chartWidth / data.length;
-  const barWidth = Math.min(28, Math.max(12, barSlot - 8));
+  const stepX = (chartWidth - PADDING * 2) / (data.length - 1 || 1);
+  
+  const points = data.map((d, i) => ({
+    x: PADDING + i * stepX,
+    y: CHART_HEIGHT - PADDING - (d.searches / maxValue) * (CHART_HEIGHT - PADDING * 2),
+  }));
+  
+  const linePath = createSmoothPath(points);
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${CHART_HEIGHT - PADDING} L ${points[0].x} ${CHART_HEIGHT - PADDING} Z`;
 
   return (
     <View style={styles.wrap}>
-      <View style={[styles.barRow, { height: BAR_HEIGHT }]}>
-        {data.map((d) => {
-          const h = Math.max(4, (d.searches / maxValue) * (BAR_HEIGHT - 24));
+      <Svg width={chartWidth} height={CHART_HEIGHT}>
+        <Defs>
+          <LinearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <Stop offset="0%" stopColor={colors.accent} stopOpacity="0.4" />
+            <Stop offset="100%" stopColor={colors.accent} stopOpacity="0.05" />
+          </LinearGradient>
+        </Defs>
+        
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = PADDING + ratio * (CHART_HEIGHT - PADDING * 2);
           return (
-            <View key={d.date} style={[styles.barSlot, { width: barSlot }]}>
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height: h,
-                    width: barWidth,
-                    backgroundColor: colors.accent,
-                  },
-                ]}
-              />
-              <Text style={[styles.barLabel, { color: colors.muted }]} numberOfLines={1}>
-                {d.date.length > 8 ? d.date.slice(0, 6) : d.date}
-              </Text>
-            </View>
+            <Path
+              key={ratio}
+              d={`M ${PADDING} ${y} L ${chartWidth - PADDING} ${y}`}
+              stroke={colors.muted}
+              strokeOpacity="0.1"
+              strokeWidth="1"
+            />
+          );
+        })}
+        
+        {/* Area fill */}
+        <Path d={areaPath} fill="url(#gradient)" />
+        
+        {/* Line */}
+        <Path d={linePath} stroke={colors.accent} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        
+        {/* Data points */}
+        {points.map((p, i) => (
+          <Circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r="4"
+            fill={colors.cardBg}
+            stroke={colors.accent}
+            strokeWidth="2"
+          />
+        ))}
+      </Svg>
+      
+      {/* X-axis labels */}
+      <View style={[styles.xAxisLabels, { width: chartWidth }]}>
+        {data.map((d, i) => {
+          if (data.length > 10 && i % Math.ceil(data.length / 5) !== 0) return null;
+          return (
+            <Text key={d.date} style={[styles.xAxisLabel, { color: colors.muted }]}>
+              {d.date.length > 8 ? d.date.slice(0, 6) : d.date}
+            </Text>
           );
         })}
       </View>
+      
       <Text style={[styles.axisHint, { color: colors.muted }]}>
         Max: {maxValue} search{maxValue === 1 ? '' : 'es'}
       </Text>
@@ -125,10 +189,8 @@ export const LocatorPieChart = React.memo(function LocatorPieChart({ data }: { d
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', overflow: 'hidden' },
-  barRow: { flexDirection: 'row', alignItems: 'flex-end', width: '100%' },
-  barSlot: { alignItems: 'center', justifyContent: 'flex-end' },
-  bar: { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-  barLabel: { fontSize: 9, marginTop: 4, textAlign: 'center', maxWidth: 48 },
+  xAxisLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingHorizontal: PADDING },
+  xAxisLabel: { fontSize: 9, textAlign: 'center' },
   axisHint: { fontSize: 10, marginTop: 8 },
   pieWrap: { alignItems: 'center', gap: 12 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },

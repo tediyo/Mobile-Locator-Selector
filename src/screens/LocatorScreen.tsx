@@ -1,6 +1,7 @@
 import Clipboard from '@react-native-clipboard/clipboard';
 import { Picker } from '@react-native-picker/picker';
-import { useState } from 'react';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiFetch } from '../api/client';
 import { DashboardHeader } from '../components/DashboardHeader';
@@ -13,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useUserData } from '../context/UserDataContext';
 import { LOCATOR_TYPES, generateSnippet, type Framework } from '../lib/locator-snippets';
+import type { MainTabParamList } from '../navigation/types';
 import { monoFont } from '../theme/tokens';
 
 interface LocatorResult {
@@ -24,6 +26,7 @@ export function LocatorScreen() {
   const { token } = useAuth();
   const { invalidateHistory, refreshHistory } = useUserData();
   const { colors } = useTheme();
+  const route = useRoute<RouteProp<MainTabParamList, 'Locator'>>();
   const [url, setUrl] = useState('');
   const [keyword, setKeyword] = useState('');
   const [locatorType, setLocatorType] = useState('xpath');
@@ -38,47 +41,70 @@ export function LocatorScreen() {
   const [authWarning, setAuthWarning] = useState<string | null>(null);
   const [framework, setFramework] = useState<Framework>('playwright');
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const lastRerunKey = useRef<string | null>(null);
 
-  const handleGenerate = async () => {
-    setLoading(true);
-    setError('');
-    setResults([]);
-    setAuthWarning(null);
-    try {
-      const { ok, data } = await apiFetch<LocatorResult[] | { warning?: string; hint?: string; results?: [] }>(
-        '/locator/generate',
-        {
-          method: 'POST',
-          token,
-          body: JSON.stringify({
-            url,
-            keyword,
-            locatorType,
-            cookies: cookies || undefined,
-            authToken: authToken || undefined,
-            siteUsername: siteUsername || undefined,
-            sitePassword: sitePassword || undefined,
-          }),
-        },
-      );
-      if (ok) {
-        if (Array.isArray(data)) {
-          setResults(data);
-          invalidateHistory();
-          refreshHistory(true);
-        } else if (data && typeof data === 'object' && 'warning' in data) {
-          setAuthWarning(`${data.warning}\n${data.hint ?? ''}`);
-          setShowAuth(true);
+  const handleGenerate = useCallback(
+    async (override?: { url?: string; keyword?: string; locatorType?: string }) => {
+      const reqUrl = override?.url ?? url;
+      const reqKeyword = override?.keyword ?? keyword;
+      const reqType = override?.locatorType ?? locatorType;
+      if (!reqUrl || !reqKeyword) return;
+      setLoading(true);
+      setError('');
+      setResults([]);
+      setAuthWarning(null);
+      try {
+        const { ok, data } = await apiFetch<LocatorResult[] | { warning?: string; hint?: string; results?: [] }>(
+          '/locator/generate',
+          {
+            method: 'POST',
+            token,
+            body: JSON.stringify({
+              url: reqUrl,
+              keyword: reqKeyword,
+              locatorType: reqType,
+              cookies: cookies || undefined,
+              authToken: authToken || undefined,
+              siteUsername: siteUsername || undefined,
+              sitePassword: sitePassword || undefined,
+            }),
+          },
+        );
+        if (ok) {
+          if (Array.isArray(data)) {
+            setResults(data);
+            invalidateHistory();
+            refreshHistory(true);
+          } else if (data && typeof data === 'object' && 'warning' in data) {
+            setAuthWarning(`${data.warning}\n${data.hint ?? ''}`);
+            setShowAuth(true);
+          }
+        } else {
+          setError('Generation failed');
         }
-      } else {
-        setError('Generation failed');
+      } catch {
+        setError('Connection error');
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setError('Connection error');
-    } finally {
-      setLoading(false);
+    },
+    [url, keyword, locatorType, cookies, authToken, siteUsername, sitePassword, token, invalidateHistory, refreshHistory],
+  );
+
+  useEffect(() => {
+    const params = route.params;
+    if (!params?.url) return;
+    const key = `${params.url}|${params.keyword ?? ''}|${params.locatorType ?? ''}`;
+    if (lastRerunKey.current === key) return;
+    lastRerunKey.current = key;
+
+    setUrl(params.url);
+    if (params.keyword) setKeyword(params.keyword);
+    if (params.locatorType) setLocatorType(params.locatorType);
+    if (params.autoRun) {
+      handleGenerate({ url: params.url, keyword: params.keyword, locatorType: params.locatorType });
     }
-  };
+  }, [route.params, handleGenerate]);
 
   const copyText = (text: string, idx: number) => {
     Clipboard.setString(text);
@@ -115,7 +141,7 @@ export function LocatorScreen() {
           </View>
         )}
 
-        <PrimaryButton title={loading ? 'Generating…' : 'Generate Locators'} onPress={handleGenerate} loading={loading} disabled={!url || !keyword} />
+        <PrimaryButton title={loading ? 'Generating…' : 'Generate Locators'} onPress={() => handleGenerate()} loading={loading} disabled={!url || !keyword} />
 
         {error ? <Text style={{ color: colors.error }}>{error}</Text> : null}
         {authWarning ? <Text style={{ color: colors.tagText, fontSize: 13 }}>{authWarning}</Text> : null}
