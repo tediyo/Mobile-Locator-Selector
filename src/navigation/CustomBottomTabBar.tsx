@@ -15,15 +15,12 @@ const TAB_ICONS: Record<string, string> = {
 const PROFILE_ROUTE = 'Profile';
 
 export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const pillIconColor = theme === 'dark' ? '#ffffff' : '#000000';
 
   const pillRoutes = state.routes.filter((r) => r.name !== PROFILE_ROUTE);
   const profileRoute = state.routes.find((r) => r.name === PROFILE_ROUTE);
-  const profileIndex = profileRoute
-    ? state.routes.findIndex((r) => r.key === profileRoute.key)
-    : -1;
-  const isProfileActive = profileIndex !== -1 && state.index === profileIndex;
 
   const onProfilePress = () => {
     if (!profileRoute) return;
@@ -87,12 +84,12 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
               <Icon
                 name={iconName}
                 size={22}
-                color={isFocused ? colors.accent : colors.tabInactive}
+                color={isFocused ? colors.accent : pillIconColor}
               />
               <Text
                 style={[
                   styles.label,
-                  { color: isFocused ? colors.accent : colors.tabInactive },
+                  { color: isFocused ? colors.accent : pillIconColor },
                 ]}
               >
                 {label}
@@ -107,15 +104,11 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
           onPress={onProfilePress}
           style={[
             styles.profile,
-            { backgroundColor: isProfileActive ? colors.accent : colors.cardBg },
+            { backgroundColor: colors.accent },
             shadow('lg', colors.shadow ?? '#0f172a'),
           ]}
         >
-          <Icon
-            name="user"
-            size={22}
-            color={isProfileActive ? '#ffffff' : colors.tabInactive}
-          />
+          <Icon name="user" size={22} color="#ffffff" />
         </Pressable>
       ) : null}
     </View>

@@ -1,31 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { Screen } from '../components/Screen';
-import { Card } from '../components/ui/Card';
-import { AppInput } from '../components/ui/AppInput';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { apiFetch } from '../api/client';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { InfoRow } from '../components/profile/InfoRow';
+import { ProfileAvatar } from '../components/profile/ProfileAvatar';
 import { ProfileSection } from '../components/profile/ProfileSection';
 import { SettingRow } from '../components/profile/SettingRow';
 import { ThemeSelector } from '../components/profile/ThemeSelector';
-import { InfoRow } from '../components/profile/InfoRow';
+import { Screen } from '../components/Screen';
+import { AppInput } from '../components/ui/AppInput';
+import { Card } from '../components/ui/Card';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { useAuth } from '../context/AuthContext';
-import { useUserData } from '../context/UserDataContext';
 import { useTheme } from '../context/ThemeContext';
-import { API_URL } from '../config/api';
-import { apiFetch } from '../api/client';
-import { ProfileAvatar } from '../components/profile/ProfileAvatar';
-import { resolveProfilePictureUrl } from '../lib/profilePicture';
 import type { ProfileData } from '../context/UserDataContext';
-
-function formatMemberSince(iso?: string): string {
-  if (!iso) return 'Not available';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Not available';
-  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-}
+import { useUserData } from '../context/UserDataContext';
+import { resolveProfilePictureUrl } from '../lib/profilePicture';
 
 export function ProfileScreen() {
   const { user, token, logout } = useAuth();
@@ -94,8 +86,6 @@ export function ProfileScreen() {
 
   const pictureUrl = profile?.pictureUrl ?? user?.picture ?? null;
 
-  const accountType = profile?.isGoogleUser ? 'Google' : 'Email & password';
-  const memberSince = formatMemberSince(profile?.createdAt);
   const themeLabel =
     themePreference === 'system' ? `System (${theme})` : themePreference === 'dark' ? 'Dark' : 'Light';
 
@@ -103,7 +93,7 @@ export function ProfileScreen() {
     <Screen scroll>
       <DashboardHeader />
 
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Profile & Settings</Text>
+     
       <Text style={[styles.pageSubtitle, { color: colors.muted }]}>
         Manage your account, appearance, and preferences
       </Text>
@@ -131,9 +121,10 @@ export function ProfileScreen() {
                   size={11}
                   color={colors.badgeText}
                 />
-                <Text style={[styles.badgeText, { color: colors.badgeText }]}>{accountType}</Text>
+                <Text style={[styles.badgeText, { color: colors.badgeText }]}>
+                  {profile?.isGoogleUser ? 'Google' : 'Email'}
+                </Text>
               </View>
-              <Text style={[styles.memberSince, { color: colors.muted }]}>Member since {memberSince}</Text>
             </View>
           </View>
         </View>
@@ -165,8 +156,7 @@ export function ProfileScreen() {
               <InfoRow label="Full name" value={profile?.fullName || '—'} />
               <InfoRow label="Email" value={profile?.email || user?.email || '—'} />
               <InfoRow label="Phone" value={profile?.phoneNumber || '—'} />
-              <InfoRow label="Member since" value={memberSince} />
-              <InfoRow label="User ID" value={profile?.id ? `#${profile.id.slice(-8)}` : '—'} />
+            
               <Pressable onPress={() => setEditing(true)} style={styles.editLink}>
                 <Icon name="pencil" size={14} color={colors.accent} />
                 <Text style={{ color: colors.accent, fontWeight: '600' }}>Edit profile</Text>
@@ -200,35 +190,11 @@ export function ProfileScreen() {
             <ThemeSelector />
           </View>
         </Card>
-
-        <View style={{ gap: 8, marginTop: 4 }}>
-          <SettingRow
-            icon="bell-o"
-            label="Notifications"
-            value="Coming soon"
-            disabled
-            showChevron={false}
-          />
-          {/* <SettingRow
-            icon="globe"
-            label="API server"
-            value={API_URL.replace(/^https?:\/\//, '').slice(0, 32)}
-            disabled
-            showChevron={false}
-          /> */}
-        </View>
       </ProfileSection>
 
       {/* Account management */}
       <ProfileSection title="Account management" subtitle="Security and session">
         <View style={{ gap: 8 }}>
-          <SettingRow icon="id-card-o" label="Sign-in method" value={accountType} showChevron={false} />
-          <SettingRow
-            icon="calendar-o"
-            label="Member since"
-            value={formatMemberSince(profile?.createdAt)}
-            showChevron={false}
-          />
           {!profile?.isGoogleUser ? (
             <SettingRow
               icon="lock"
