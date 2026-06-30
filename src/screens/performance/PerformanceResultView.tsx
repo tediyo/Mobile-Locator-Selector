@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { PerformanceMetricsTable } from '../../components/performance/PerformanceMetricsTable';
 import { PerformanceResourcesTable } from '../../components/performance/PerformanceResourcesTable';
 import { ScoreRing } from '../../components/performance/ScoreRing';
@@ -25,16 +25,6 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
   const m = result.metrics;
   const [downloading, setDownloading] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
-
-  const shareReport = async () => {
-    const lines = [
-      `Performance: ${result.score}/100`,
-      result.url,
-      `TTFB ${formatMs(m.ttfbMs)} · LCP ${formatMs(m.lcpMs)} · Load ${formatMs(m.loadTimeMs)}`,
-      `${result.findings.length} findings`,
-    ];
-    await Share.share({ message: lines.join('\n') });
-  };
 
   const downloadReport = async () => {
     if (downloading) return;
@@ -189,9 +179,6 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
             <Text style={{ color: colors.accent, fontWeight: '600' }}>Re-run</Text>
           </Pressable>
         ) : null}
-        <Pressable onPress={shareReport} style={[styles.btn, { borderColor: colors.cardBorder }]}>
-          <Text style={{ color: colors.foreground, fontWeight: '600' }}>Share</Text>
-        </Pressable>
         <Pressable
           onPress={downloadReport}
           disabled={downloading}
