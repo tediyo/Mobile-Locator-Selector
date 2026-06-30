@@ -1,7 +1,7 @@
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { PerformanceMetricsTable } from '../../components/performance/PerformanceMetricsTable';
+import { PerformanceResourcesTable } from '../../components/performance/PerformanceResourcesTable';
 import { ScoreRing } from '../../components/performance/ScoreRing';
 import { Card } from '../../components/ui/Card';
 import { useTheme } from '../../context/ThemeContext';
@@ -11,8 +11,9 @@ import {
     severityBg,
     severityColor,
 } from '../../lib/performance-format';
+import { buildPerformanceMetricRows } from '../../lib/performance-metrics-rows';
 import type { PerformanceScanResult } from '../../lib/performance-types';
-import type { PerformanceStackParamList } from '../../navigation/PerformanceStack';
+
 type Props = {
   result: PerformanceScanResult;
   onDelete?: () => void;
@@ -20,10 +21,10 @@ type Props = {
 };
 
 export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
-  const navigation = useNavigation<NativeStackNavigationProp<PerformanceStackParamList>>();
   const { colors } = useTheme();
   const m = result.metrics;
   const [downloading, setDownloading] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   const shareReport = async () => {
     const lines = [
@@ -94,8 +95,13 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
                   {m.runCount} passes · median
                 </Text>
               ) : null}
+              {m.scoreMin != null && m.scoreMax != null && m.scoreMin !== m.scoreMax ? (
+                <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
+                  Score range {Math.round(m.scoreMin)}–{Math.round(m.scoreMax)}
+                </Text>
+              ) : null}
               <Text style={[styles.pill, { color: colors.muted, borderColor: colors.cardBorder }]}>
-                Scan time: {formatMs(result.durationMs)}
+                {(result.durationMs / 1000).toFixed(0)}s total
               </Text>
             </View>
             <Text style={{ color: colors.muted, fontSize: 11, marginTop: 6 }}>
@@ -107,20 +113,39 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
 
       <Card style={{ gap: 12 }}>
         <Text style={[styles.section, { color: colors.foreground }]}>Quick summary</Text>
-        <View style={styles.summaryRow}>
-          <SummaryChip label="TTFB" value={formatMs(m.ttfbMs)} colors={colors} />
-          <SummaryChip label="LCP" value={formatMs(m.lcpMs)} colors={colors} />
-          <SummaryChip label="Load" value={formatMs(m.loadTimeMs)} colors={colors} />
+        <View style={styles.metricsGrid}>
+          <MetricTile label="TTFB" value={formatMs(m.ttfbMs)} hint="Target < 600ms" colors={colors} />
+          <MetricTile label="FCP" value={formatMs(m.fcpMs)} hint="First contentful paint" colors={colors} />
+          <MetricTile label="LCP" value={formatMs(m.lcpMs)} hint="Target < 2.5s" colors={colors} />
+          <MetricTile label="Load" value={formatMs(m.loadTimeMs)} hint="Load event end" colors={colors} />
+          <MetricTile label="Requests" value={String(m.requestCount)} hint={`${m.failedRequestCount} failed`} colors={colors} />
+          <MetricTile label="Transfer" value={formatBytes(m.totalTransferBytes)} hint={`${m.domElementCount} DOM nodes`} colors={colors} />
         </View>
+
         <Pressable
-          onPress={() => navigation.navigate('PerformanceMetrics', { result })}
-          style={[styles.metricsBtn, { borderColor: colors.accent, backgroundColor: colors.surface }]}
+          onPress={() => setShowMetrics(!showMetrics)}
+          style={[
+            styles.metricsBtn,
+            {
+              borderColor: showMetrics ? colors.accent : colors.cardBorder,
+              backgroundColor: showMetrics ? colors.surface : colors.surface,
+            },
+          ]}
         >
-          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 15 }}>Performance metrics</Text>
+          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 15 }}>
+            {showMetrics ? 'Hide metrics table' : 'Performance metrics'}
+          </Text>
           <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>
-            View full table (timing, network, DOM, scan info)
+            {showMetrics ? 'View full table (timing, network, DOM, scan info)' : 'Tap to view detailed metrics'}
           </Text>
         </Pressable>
+
+        {showMetrics ? (
+          <View style={{ marginTop: 8 }}>
+            <Text style={[styles.section, { color: colors.foreground, fontSize: 13 }]}>Detailed metrics</Text>
+            <PerformanceMetricsTable rows={buildPerformanceMetricRows(result)} />
+          </View>
+        ) : null}
       </Card>
 
       <Card style={{ gap: 10 }}>
@@ -152,21 +177,9 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
       </Card>
 
       {result.networkTop.length > 0 ? (
-        <Card style={{ gap: 8 }}>
+        <Card style={{ gap: 10 }}>
           <Text style={[styles.section, { color: colors.foreground }]}>Slowest resources</Text>
-          {result.networkTop.slice(0, 8).map((r, i) => (
-            <View key={i} style={[styles.netRow, { borderBottomColor: colors.cardBorder }]}>
-              <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
-                {r.resourceType} · {r.status}
-              </Text>
-              <Text style={{ color: colors.muted, fontSize: 11 }} numberOfLines={2}>
-                {r.url}
-              </Text>
-              <Text style={{ color: colors.muted, fontSize: 11 }}>
-                {formatMs(r.durationMs)} · {formatBytes(r.transferSize)}
-              </Text>
-            </View>
-          ))}
+          <PerformanceResourcesTable rows={result.networkTop} />
         </Card>
       ) : null}
 
@@ -198,19 +211,22 @@ export function PerformanceResultView({ result, onDelete, onRerun }: Props) {
   );
 }
 
-function SummaryChip({
+function MetricTile({
   label,
   value,
+  hint,
   colors,
 }: {
   label: string;
   value: string;
-  colors: { muted: string; foreground: string; surface: string };
+  hint?: string;
+  colors: { muted: string; foreground: string; surface: string; cardBorder: string };
 }) {
   return (
-    <View style={[styles.summaryChip, { backgroundColor: colors.surface }]}>
-      <Text style={{ color: colors.muted, fontSize: 10, fontWeight: '600' }}>{label}</Text>
-      <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '700' }}>{value}</Text>
+    <View style={[styles.metricTile, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+      <Text style={{ color: colors.muted, fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>{label}</Text>
+      <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: '700' }}>{value}</Text>
+      {hint ? <Text style={{ color: colors.muted, fontSize: 10 }}>{hint}</Text> : null}
     </View>
   );
 }
@@ -223,13 +239,12 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   pill: { fontSize: 11, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
   section: { fontSize: 15, fontWeight: '700' },
-  summaryRow: { flexDirection: 'row', gap: 8 },
-  summaryChip: { flex: 1, padding: 10, borderRadius: 8, gap: 2, alignItems: 'center' },
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  metricTile: { flexBasis: '30%', flexGrow: 1, borderWidth: 1, borderRadius: 8, padding: 10, gap: 2 },
   metricsBtn: { padding: 14, borderRadius: 10, borderWidth: 1 },
   finding: { padding: 12, borderRadius: 8, borderWidth: 1, gap: 4 },
   findingHead: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sev: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  netRow: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, gap: 2 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   btn: { flex: 1, minWidth: '30%', padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
 });
