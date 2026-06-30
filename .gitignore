@@ -5,7 +5,8 @@ yarn-debug.*
 yarn-error.*
 .DS_Store
 *.pem
-.env
+.env 
+*.hprof
 .env*.local
 *.tsbuildinfo
 .kotlin/
