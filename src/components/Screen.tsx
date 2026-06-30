@@ -25,8 +25,10 @@ export function Screen({
   );
 }
 
+const TAB_BAR_HEIGHT = 92;
+
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  fill: { flex: 1 },
-  scroll: { padding: spacing.lg, paddingBottom: spacing['2xl'] + spacing.md, flexGrow: 1 },
+  fill: { flex: 1, paddingBottom: TAB_BAR_HEIGHT },
+  scroll: { padding: spacing.lg, paddingBottom: TAB_BAR_HEIGHT + spacing.lg, flexGrow: 1 },
 });
