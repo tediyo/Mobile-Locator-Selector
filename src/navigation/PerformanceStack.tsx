@@ -1,13 +1,13 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '../context/ThemeContext';
-import { PerformanceScanScreen } from '../screens/performance/PerformanceScanScreen';
-import { PerformanceResultScreen } from '../screens/performance/PerformanceResultScreen';
+import type { PerformanceScanResult } from '../lib/performance-types';
 import { PerformanceHistoryScreen } from '../screens/performance/PerformanceHistoryScreen';
 import { PerformanceMetricsScreen } from '../screens/performance/PerformanceMetricsScreen';
-import type { PerformanceScanResult } from '../lib/performance-types';
+import { PerformanceResultScreen } from '../screens/performance/PerformanceResultScreen';
+import { PerformanceScanScreen } from '../screens/performance/PerformanceScanScreen';
 
 export type PerformanceStackParamList = {
-  PerformanceScan: undefined;
+  PerformanceScan: { url?: string; viewport?: 'desktop' | 'mobile'; autoStart?: boolean } | undefined;
   PerformanceResult: { result: PerformanceScanResult };
   PerformanceMetrics: { result: PerformanceScanResult };
   PerformanceHistory: undefined;

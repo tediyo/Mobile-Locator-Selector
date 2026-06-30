@@ -1,6 +1,6 @@
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { runPerformanceScan } from '../../api/performance';
 import { DashboardHeader } from '../../components/DashboardHeader';
@@ -16,10 +16,12 @@ import type { PerformanceStackParamList } from '../../navigation/PerformanceStac
 
 export function PerformanceScanScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PerformanceStackParamList>>();
+  const route = useRoute();
+  const params = (route.params ?? {}) as { url?: string; viewport?: 'desktop' | 'mobile'; autoStart?: boolean };
   const { token, isGuest } = useAuth();
   const { colors } = useTheme();
-  const [url, setUrl] = useState('https://');
-  const [viewport, setViewport] = useState<PerformanceViewport>('desktop');
+  const [url, setUrl] = useState(params.url?.trim() || 'https://');
+  const [viewport, setViewport] = useState<PerformanceViewport>(params.viewport ?? 'desktop');
   const [cookies, setCookies] = useState('');
   const [authToken, setAuthToken] = useState('');
   const [siteUsername, setSiteUsername] = useState('');
@@ -27,6 +29,13 @@ export function PerformanceScanScreen() {
   const [showAuth, setShowAuth] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (params.autoStart && url.trim().startsWith('http')) {
+      handleScan();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleScan = async () => {
     const trimmed = url.trim();
