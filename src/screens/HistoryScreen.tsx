@@ -1,4 +1,5 @@
 import Clipboard from '@react-native-clipboard/clipboard';
+
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -99,6 +100,7 @@ export function HistoryScreen() {
       params: { url, viewport: viewport === 'mobile' ? 'mobile' : 'desktop', autoStart: true },
     });
   };
+
 
   if (isGuest || !token) {
     return (
