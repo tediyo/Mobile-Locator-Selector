@@ -1,5 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getPerformanceHistory } from '../api/performance';
 import { ActivityBarChart, LocatorPieChart } from '../components/AnalyticsCharts';
@@ -88,6 +88,18 @@ export function OverviewScreen() {
 
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportButtonRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (exportMenuOpen && exportButtonRef.current) {
+      exportButtonRef.current.measure((x, y, width, height, pageX, pageY) => {
+        setMenuPosition({ top: pageY + height + 4, right: 16 });
+      });
+    } else {
+      setMenuPosition(null);
+    }
+  }, [exportMenuOpen]);
 
   const handleExport = useCallback(
     async (format: ExportFormat) => {
@@ -147,15 +159,64 @@ export function OverviewScreen() {
       <Text style={[styles.pageTitle, { color: colors.foreground }]}>Analytics Overview</Text>
 
       <Card style={{ gap: 12, marginBottom: 16 }}>
-        <SegmentedControl
-          value={activeTab}
-          onChange={(v) => setActiveTab(v as 'locator' | 'performance')}
-          options={[
-            { value: 'locator', label: 'Locator' },
-            { value: 'performance', label: 'Performance' },
-          ]}
-        />
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          <View style={{ flex: 1 }}>
+            <SegmentedControl
+              value={activeTab}
+              onChange={(v) => setActiveTab(v as 'locator' | 'performance')}
+              options={[
+                { value: 'locator', label: 'Locator' },
+                { value: 'performance', label: 'Performance' },
+              ]}
+            />
+          </View>
+          {(() => {
+            const noData = activeTab === 'locator' ? filtered.length === 0 : perfHistory.length === 0;
+            return (
+              <View ref={exportButtonRef}>
+                <Pressable
+                  onPress={() => setExportMenuOpen((o) => !o)}
+                  disabled={!!exporting || noData}
+                  style={[
+                    styles.exportButton,
+                    { borderColor: colors.accent, opacity: !!exporting || noData ? 0.5 : 1 },
+                  ]}
+                >
+                  {exporting ? (
+                    <ActivityIndicator color={colors.accent} size="small" />
+                  ) : (
+                    <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                      Export
+                    </Text>
+                  )}
+                  <Text style={{ color: colors.accent, fontSize: 12, marginLeft: 6 }}>
+                    {exportMenuOpen ? '▲' : '▼'}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+        </View>
       </Card>
+
+      {exportMenuOpen && !exporting && menuPosition && (
+        <View style={[styles.exportMenu, { borderColor: colors.cardBorder, backgroundColor: colors.cardBg, top: menuPosition.top, right: menuPosition.right }]}>
+          {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt) => (
+            <Pressable
+              key={fmt}
+              onPress={() => {
+                setExportMenuOpen(false);
+                handleExport(fmt);
+              }}
+              style={styles.exportMenuItem}
+            >
+              <Text style={{ color: colors.foreground, fontWeight: '600', fontSize: 13 }}>
+                {fmt.toUpperCase()}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       <Card style={{ gap: 12, marginBottom: 16 }}>
         <Text style={[styles.sectionLabel, { color: colors.muted }]}>REPORT PERIOD</Text>
@@ -285,56 +346,6 @@ export function OverviewScreen() {
           )}
         </Card>
       )}
-
-      <Card style={{ marginTop: 16, gap: 12, marginBottom: 24 }}>
-        <Text style={[styles.chartTitle, { color: colors.foreground }]}>Export report</Text>
-        <Text style={{ color: colors.muted, fontSize: 12 }}>
-          Download the {activeTab} analytics for the selected period ({activeTab === 'locator' ? perf.recordCount : perfHistory.length} {activeTab === 'locator' ? (perf.recordCount === 1 ? 'record' : 'records') : (perfHistory.length === 1 ? 'scan' : 'scans')}).
-        </Text>
-        {(() => {
-          const noData = activeTab === 'locator' ? filtered.length === 0 : perfHistory.length === 0;
-          return (
-            <View>
-              <Pressable
-                onPress={() => setExportMenuOpen((o) => !o)}
-                disabled={!!exporting || noData}
-                style={[
-                  styles.exportDropdown,
-                  { borderColor: colors.accent, opacity: !!exporting || noData ? 0.5 : 1 },
-                ]}
-              >
-                {exporting ? (
-                  <ActivityIndicator color={colors.accent} size="small" />
-                ) : (
-                  <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
-                    Export as…
-                  </Text>
-                )}
-                <Text style={{ color: colors.accent, fontSize: 12 }}>{exportMenuOpen ? '▲' : '▼'}</Text>
-              </Pressable>
-
-              {exportMenuOpen && !exporting && (
-                <View style={[styles.exportMenu, { borderColor: colors.cardBorder, backgroundColor: colors.cardBg }]}>
-                  {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt) => (
-                    <Pressable
-                      key={fmt}
-                      onPress={() => {
-                        setExportMenuOpen(false);
-                        handleExport(fmt);
-                      }}
-                      style={styles.exportMenuItem}
-                    >
-                      <Text style={{ color: colors.foreground, fontWeight: '600', fontSize: 13 }}>
-                        {fmt.toUpperCase()}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </View>
-          );
-        })()}
-      </Card>
     </Screen>
   );
 }
@@ -350,24 +361,26 @@ const styles = StyleSheet.create({
   kpiLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4 },
   kpiVal: { fontSize: 24, fontWeight: '700' },
   chartTitle: { fontSize: 16, fontWeight: '700' },
-  exportDropdown: {
+  exportButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     borderWidth: 1,
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    minHeight: 44,
+    minHeight: 40,
   },
   exportMenu: {
-    marginTop: 6,
+    position: 'absolute',
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
+    zIndex: 999,
+    elevation: 20,
   },
   exportMenuItem: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
   },
 });
