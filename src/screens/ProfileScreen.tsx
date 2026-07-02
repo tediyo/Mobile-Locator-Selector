@@ -135,7 +135,7 @@ export function ProfileScreen() {
       </Card>
 
       {/* Basic profile */}
-      <ProfileSection >
+      <ProfileSection title="Profile">
         {loadError ? (
           <Text style={{ color: colors.error, fontSize: 13, marginBottom: 8 }}>{loadError}</Text>
         ) : null}
@@ -308,6 +308,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
   },
   modalHeader: {
     flexDirection: 'row',

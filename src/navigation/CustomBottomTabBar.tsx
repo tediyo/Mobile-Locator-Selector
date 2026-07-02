@@ -13,6 +13,7 @@ const TAB_ICONS: Record<string, string> = {
 };
 
 const PROFILE_ROUTE = 'Profile';
+const YELLOW_BORDER = '#fbbf24';
 
 export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors, theme } = useTheme();
@@ -126,15 +127,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingTop: 8,
+    zIndex: 10,
+    elevation: 10,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
     height: 64,
-    borderRadius: 32,
+    borderRadius: 16,
     paddingHorizontal: 8,
     flex: 1,
+    borderWidth: 1,
+    borderColor: YELLOW_BORDER,
   },
   tab: {
     flex: 1,

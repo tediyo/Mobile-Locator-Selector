@@ -87,6 +87,7 @@ export function OverviewScreen() {
   }, [perfHistory]);
 
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const handleExport = useCallback(
     async (format: ExportFormat) => {
@@ -101,9 +102,9 @@ export function OverviewScreen() {
         const path = await exportAnalytics(format, {
           filter: appliedFilter,
           entries: activeTab === 'locator' ? filtered : [],
-          stats: activeTab === 'locator' ? stats : undefined,
+          stats: activeTab === 'locator' ? stats : null,
           activityData: activeTab === 'locator' ? charts.activityData : perfActivityData,
-          pieData: activeTab === 'locator' ? charts.pieData : undefined,
+          pieData: activeTab === 'locator' ? charts.pieData : [],
           perfHistory: activeTab === 'performance' ? perfHistory : undefined,
           perfStats: activeTab === 'performance' ? perfStats : undefined,
         });
@@ -290,25 +291,49 @@ export function OverviewScreen() {
         <Text style={{ color: colors.muted, fontSize: 12 }}>
           Download the {activeTab} analytics for the selected period ({activeTab === 'locator' ? perf.recordCount : perfHistory.length} {activeTab === 'locator' ? (perf.recordCount === 1 ? 'record' : 'records') : (perfHistory.length === 1 ? 'scan' : 'scans')}).
         </Text>
-        <View style={styles.exportRow}>
-          {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt) => (
-            <Pressable
-              key={fmt}
-              onPress={() => handleExport(fmt)}
-              disabled={!!exporting || (activeTab === 'locator' ? filtered.length === 0 : perfHistory.length === 0)}
-              style={[
-                styles.exportBtn,
-                { borderColor: colors.accent, opacity: !!exporting || (activeTab === 'locator' ? filtered.length === 0 : perfHistory.length === 0) ? 0.5 : 1 },
-              ]}
-            >
-              {exporting === fmt ? (
-                <ActivityIndicator color={colors.accent} size="small" />
-              ) : (
-                <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>{fmt.toUpperCase()}</Text>
+        {(() => {
+          const noData = activeTab === 'locator' ? filtered.length === 0 : perfHistory.length === 0;
+          return (
+            <View>
+              <Pressable
+                onPress={() => setExportMenuOpen((o) => !o)}
+                disabled={!!exporting || noData}
+                style={[
+                  styles.exportDropdown,
+                  { borderColor: colors.accent, opacity: !!exporting || noData ? 0.5 : 1 },
+                ]}
+              >
+                {exporting ? (
+                  <ActivityIndicator color={colors.accent} size="small" />
+                ) : (
+                  <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                    Export as…
+                  </Text>
+                )}
+                <Text style={{ color: colors.accent, fontSize: 12 }}>{exportMenuOpen ? '▲' : '▼'}</Text>
+              </Pressable>
+
+              {exportMenuOpen && !exporting && (
+                <View style={[styles.exportMenu, { borderColor: colors.cardBorder, backgroundColor: colors.cardBg }]}>
+                  {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt) => (
+                    <Pressable
+                      key={fmt}
+                      onPress={() => {
+                        setExportMenuOpen(false);
+                        handleExport(fmt);
+                      }}
+                      style={styles.exportMenuItem}
+                    >
+                      <Text style={{ color: colors.foreground, fontWeight: '600', fontSize: 13 }}>
+                        {fmt.toUpperCase()}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               )}
-            </Pressable>
-          ))}
-        </View>
+            </View>
+          );
+        })()}
       </Card>
     </Screen>
   );
@@ -325,14 +350,24 @@ const styles = StyleSheet.create({
   kpiLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4 },
   kpiVal: { fontSize: 24, fontWeight: '700' },
   chartTitle: { fontSize: 16, fontWeight: '700' },
-  exportRow: { flexDirection: 'row', gap: 8 },
-  exportBtn: {
-    flex: 1,
+  exportDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 16,
     minHeight: 44,
+  },
+  exportMenu: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  exportMenuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
 });
