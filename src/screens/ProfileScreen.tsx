@@ -222,7 +222,7 @@ export function ProfileScreen() {
       </ProfileSection>
 
       {/* Theme */}
-      <Card style={{ gap: 14 }}>
+      <Card style={{ gap: 14, marginTop: 24 }}>
         <View style={styles.settingBlock}>
           <View style={styles.settingLabelRow}>
             <Icon name="paint-brush" size={14} color={colors.accent} />
@@ -236,7 +236,7 @@ export function ProfileScreen() {
       </Card>
 
       {/* Account management */}
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: 8, marginTop: 24 }}>
         {!profile?.isGoogleUser ? (
           <SettingRow
             icon="lock"
@@ -247,9 +247,6 @@ export function ProfileScreen() {
           />
         ) : null}
 
-      </View>
-
-      <View style={{ gap: 8 }}>
         <SettingRow
           icon="envelope"
           label="Contact"
@@ -257,10 +254,8 @@ export function ProfileScreen() {
           onPress={() => setContactVisible(true)}
           showChevron
         />
+        <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
       </View>
- <View>
-   <SettingRow icon="sign-out" label="Sign out" onPress={confirmSignOut} destructive showChevron={false} />
- </View>
       <Text style={[styles.footer, { color: colors.muted }]}>ATS Locator · v1.0.0</Text>
 
       <Modal
