@@ -87,14 +87,16 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
                 size={22}
                 color={isFocused ? colors.accent : pillIconColor}
               />
-              <Text
-                style={[
-                  styles.label,
-                  { color: isFocused ? colors.accent : pillIconColor },
-                ]}
-              >
-                {label}
-              </Text>
+              {isFocused && (
+                <Text
+                  style={[
+                    styles.label,
+                    { color: colors.accent },
+                  ]}
+                >
+                  {label}
+                </Text>
+              )}
             </Pressable>
           );
         })}
@@ -135,7 +137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-evenly',
     height: 64,
-    borderRadius: 16,
+    borderRadius: 36,
     paddingHorizontal: 8,
     flex: 1,
     borderWidth: 1,

@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { changePassword } from '../api/auth';
 import { apiFetch } from '../api/client';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { InfoRow } from '../components/profile/InfoRow';
@@ -31,6 +32,11 @@ export function ProfileScreen() {
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [loadError, setLoadError] = useState('');
   const [contactVisible, setContactVisible] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -88,6 +94,36 @@ export function ProfileScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: logout },
     ]);
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Missing fields', 'Please fill in all password fields.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords do not match', 'New password and confirm password must match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert('Password too short', 'Password must be at least 6 characters.');
+      return;
+    }
+    if (!token) return;
+
+    setChangingPassword(true);
+    try {
+      await changePassword(token, { currentPassword, newPassword });
+      Alert.alert('Success', 'Password changed successfully.');
+      setPasswordModalVisible(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to change password.');
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const pictureUrl = profile?.pictureUrl ?? user?.picture ?? null;
@@ -205,16 +241,12 @@ export function ProfileScreen() {
           <SettingRow
             icon="lock"
             label="Change password"
-            value="Unavailable"
-            onPress={() =>
-              Alert.alert(
-                'Change password',
-                'Unavailable',
-              )
-            }
+            value="Update your password"
+            onPress={() => setPasswordModalVisible(true)}
+            showChevron
           />
         ) : null}
-       
+
       </View>
 
       <View style={{ gap: 8 }}>
@@ -253,6 +285,54 @@ export function ProfileScreen() {
               <SocialIcon name="portfolio" url="https://tewodrosberhanu.com/" size={28} />
               <SocialIcon name="whatsapp" url="https://wa.me/251947087598" size={28} />
               <SocialIcon name="telegram" url="https://t.me/thedron16" size={28} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Change Password</Text>
+              <Pressable onPress={() => setPasswordModalVisible(false)}>
+                <Icon name="close" size={20} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <AppInput
+                label="Current password"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry
+                placeholder="Enter current password"
+              />
+              <AppInput
+                label="New password"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                placeholder="Enter new password (min 6 characters)"
+              />
+              <AppInput
+                label="Confirm new password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                placeholder="Confirm new password"
+              />
+              <PrimaryButton
+                title={changingPassword ? 'Changing...' : 'Change Password'}
+                onPress={handleChangePassword}
+                loading={changingPassword}
+                disabled={!currentPassword || !newPassword || !confirmPassword}
+              />
             </View>
           </View>
         </View>
