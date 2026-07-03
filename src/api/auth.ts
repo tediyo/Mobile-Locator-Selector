@@ -6,7 +6,7 @@ export interface ChangePasswordRequest {
 }
 
 export async function changePassword(token: string, data: ChangePasswordRequest): Promise<void> {
-  const { ok, status } = await apiFetch<void>('/users/me/password', {
+  const { ok, status, data: response } = await apiFetch<{ message?: string }>('/users/me/password', {
     method: 'PATCH',
     token,
     body: JSON.stringify(data),
@@ -14,8 +14,8 @@ export async function changePassword(token: string, data: ChangePasswordRequest)
 
   if (!ok) {
     if (status === 401) {
-      throw new Error('Current password is incorrect');
+      throw new Error(response?.message || 'Current password is incorrect');
     }
-    throw new Error('Failed to change password');
+    throw new Error(response?.message || 'Failed to change password');
   }
 }
