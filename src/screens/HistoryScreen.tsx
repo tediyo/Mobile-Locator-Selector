@@ -9,6 +9,7 @@ import { DashboardHeader } from '../components/DashboardHeader';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/ui/Card';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { SkeletonList } from '../components/ui/Shimmer';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useUserData } from '../context/UserDataContext';
@@ -149,7 +150,7 @@ export function HistoryScreen() {
       />
 
       {loading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+        <SkeletonList count={4} />
       ) : count === 0 ? (
         <Card>
           <Text style={{ color: colors.muted, textAlign: 'center' }}>

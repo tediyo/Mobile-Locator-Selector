@@ -31,6 +31,9 @@ export const light = {
   divider: '#eef2f6',
   shadow: '#0f172a',
   overlay: 'rgba(15, 23, 42, 0.45)',
+  shimmerBase: '#e2e8f0',
+  shimmerHighlight: '#ffffff',
+  shimmerAccent: 'rgba(245, 158, 11, 0.35)',
 };
 
 export const dark = {
@@ -64,6 +67,9 @@ export const dark = {
   divider: '#1f1f23',
   shadow: '#000000',
   overlay: 'rgba(0, 0, 0, 0.6)',
+  shimmerBase: '#1d1d22',
+  shimmerHighlight: '#2e2e38',
+  shimmerAccent: 'rgba(245, 158, 11, 0.3)',
 };
 
 export type AppColors = typeof light;

@@ -2,13 +2,15 @@ import { ScrollView, StyleSheet, View, type ViewProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { spacing } from '../theme/tokens';
+import { SystemShimmerBar } from './ui/Shimmer';
 
 export function Screen({
   scroll,
   children,
   style,
+  ambientShimmer = true,
   ...props
-}: ViewProps & { scroll?: boolean }) {
+}: ViewProps & { scroll?: boolean; ambientShimmer?: boolean }) {
   const { colors } = useTheme();
   const content = scroll ? (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -20,6 +22,7 @@ export function Screen({
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }, style]} {...props}>
+      {ambientShimmer ? <SystemShimmerBar /> : null}
       {content}
     </SafeAreaView>
   );

@@ -4,6 +4,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/ui/Card';
+import { SkeletonList } from '../../components/ui/Shimmer';
 import { DashboardHeader } from '../../components/DashboardHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -85,7 +86,7 @@ export function PerformanceHistoryScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+        <SkeletonList count={4} />
       ) : items.length === 0 ? (
         <Card>
           <Text style={{ color: colors.muted, textAlign: 'center' }}>No saved scans yet.</Text>

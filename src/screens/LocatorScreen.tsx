@@ -10,6 +10,7 @@ import { AppInput } from '../components/ui/AppInput';
 import { Card } from '../components/ui/Card';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { SkeletonLocatorResults } from '../components/ui/Shimmer';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useUserData } from '../context/UserDataContext';
@@ -147,7 +148,9 @@ export function LocatorScreen() {
         {authWarning ? <Text style={{ color: colors.tagText, fontSize: 13 }}>{authWarning}</Text> : null}
       </Card>
 
-      {results.length > 0 && (
+      {loading ? (
+        <SkeletonLocatorResults />
+      ) : results.length > 0 ? (
         <View style={{ marginTop: 16, gap: 12 }}>
           <SegmentedControl
             value={framework}
@@ -187,7 +190,7 @@ export function LocatorScreen() {
             </Card>
           ))}
         </View>
-      )}
+      ) : null}
     </Screen>
   );
 }
