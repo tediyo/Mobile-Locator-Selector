@@ -9,6 +9,7 @@ import { AppInput } from '../../components/ui/AppInput';
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
+import { SkeletonPerformanceScan } from '../../components/ui/Shimmer';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import type { PerformanceViewport } from '../../lib/performance-types';
@@ -159,6 +160,8 @@ export function PerformanceScanScreen() {
           </Text>
         ) : null}
       </Card>
+
+      {scanning ? <SkeletonPerformanceScan /> : null}
 
       {token && !isGuest ? (
         <Pressable

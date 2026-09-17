@@ -7,6 +7,7 @@ import { DashboardHeader } from '../components/DashboardHeader';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/ui/Card';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { SkeletonChart, SkeletonMetric } from '../components/ui/Shimmer';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useUserData } from '../context/UserDataContext';
@@ -279,7 +280,9 @@ export function OverviewScreen() {
         />
       )}
 
-      {activeTab === 'locator' ? (
+      {(activeTab === 'locator' ? showInitialLoader : perfLoading) ? (
+        <SkeletonMetric />
+      ) : activeTab === 'locator' ? (
         <View style={styles.kpiRow}>
           <Card style={styles.kpi}>
             <Text style={[styles.kpiLabel, { color: colors.muted }]}>TOTAL SEARCHES</Text>
@@ -321,14 +324,14 @@ export function OverviewScreen() {
         </Text>
         {activeTab === 'locator' ? (
           showInitialLoader ? (
-            <ActivityIndicator color={colors.accent} />
+            <SkeletonChart type="bar" />
           ) : filtered.length === 0 ? (
             <Text style={{ color: colors.muted, textAlign: 'center' }}>No data for this period</Text>
           ) : (
             <ActivityBarChart data={charts.activityData} />
           )
         ) : perfLoading ? (
-          <ActivityIndicator color={colors.accent} />
+          <SkeletonChart type="bar" />
         ) : perfHistory.length === 0 ? (
           <Text style={{ color: colors.muted, textAlign: 'center' }}>No performance scans yet</Text>
         ) : (
@@ -340,7 +343,7 @@ export function OverviewScreen() {
         <Card style={{ marginTop: 16, gap: 12 }}>
           <Text style={[styles.chartTitle, { color: colors.foreground }]}>Locator Types</Text>
           {showInitialLoader ? (
-            <ActivityIndicator color={colors.accent} />
+            <SkeletonChart type="pie" />
           ) : (
             <LocatorPieChart data={charts.pieData} />
           )}
